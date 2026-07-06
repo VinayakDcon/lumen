@@ -26,7 +26,7 @@ export default function ApproveTimesheetsPage() {
     try {
       setLoading(true);
       setFetchError(false);
-      const res = await fetch("http://localhost:5000/api/timesheets/pending");
+      const res = await fetch("/api-proxy/timesheets/pending");
       if (res.ok) {
         const data = await res.json();
         setDbPending(data);
@@ -71,7 +71,7 @@ export default function ApproveTimesheetsPage() {
       return;
     }
     try {
-      const res = await fetch(`http://localhost:5000/api/my/timesheet/${id}/approve`, {
+      const res = await fetch(`/api-proxy/my/timesheet/${id}/approve`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action: "approve", reviewer: user?.name || "Reviewer" })
@@ -98,7 +98,7 @@ export default function ApproveTimesheetsPage() {
     }
 
     try {
-      const res = await fetch(`http://localhost:5000/api/my/timesheet/${id}/approve`, {
+      const res = await fetch(`/api-proxy/my/timesheet/${id}/approve`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action: "reject", notes: trimmedNotes, reviewer: user?.name || "Reviewer" })

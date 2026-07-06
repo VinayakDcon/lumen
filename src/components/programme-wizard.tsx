@@ -174,7 +174,7 @@ export function ProgrammeWizard() {
         setWizStep(1);
 
         // Fetch phases from DB
-        fetch(`http://localhost:5000/api/programmes/${prog.id}/phases`)
+        fetch(`/api-proxy/programmes/${prog.id}/phases`)
           .then(res => {
             if (!res.ok) throw new Error("Failed to load phases");
             return res.json();
@@ -390,7 +390,7 @@ export function ProgrammeWizard() {
 
     if (wizardMode === "edit") {
       try {
-        const res = await fetch(`http://localhost:5000/api/programmes/${payload.id}`, {
+        const res = await fetch(`/api-proxy/programmes/${payload.id}`, {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(payload)
@@ -417,7 +417,7 @@ export function ProgrammeWizard() {
     } else {
       // Create mode
       try {
-        const res = await fetch("http://localhost:5000/api/programmes", {
+        const res = await fetch("/api-proxy/programmes", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(payload)

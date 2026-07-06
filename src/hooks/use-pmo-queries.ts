@@ -9,7 +9,7 @@ export function useProgrammesQuery() {
   return useQuery<Programme[]>({
     queryKey: ["programmes"],
     queryFn: async () => {
-      const res = await fetch("http://localhost:5000/api/programmes");
+      const res = await fetch("/api-proxy/programmes");
       if (!res.ok) throw new Error("Failed to fetch");
       return res.json();
     },
@@ -20,7 +20,7 @@ export function useActiveProgrammeQuery(id: string) {
   return useQuery<Programme | null>({
     queryKey: ["programme", id],
     queryFn: async () => {
-      const res = await fetch(`http://localhost:5000/api/programmes/${id}`);
+      const res = await fetch(`/api-proxy/programmes/${id}`);
       if (!res.ok) throw new Error("Failed to fetch");
       return res.json();
     },
@@ -32,7 +32,7 @@ export function useDashboardMetricsQuery(id: string) {
   return useQuery<DashboardMetrics | null>({
     queryKey: ["dashboard", id],
     queryFn: async () => {
-      const res = await fetch(`http://localhost:5000/api/dashboard?programme_id=${id}`);
+      const res = await fetch(`/api-proxy/dashboard?programme_id=${id}`);
       if (!res.ok) throw new Error("Failed to fetch");
       return res.json();
     },
@@ -44,7 +44,7 @@ export function useTemplatesQuery() {
   return useQuery<Archetype[]>({
     queryKey: ["templates"],
     queryFn: async () => {
-      const res = await fetch("http://localhost:5000/api/templates/library");
+      const res = await fetch("/api-proxy/templates/library");
       if (!res.ok) throw new Error("Failed to fetch templates");
       return res.json();
     },
@@ -81,7 +81,7 @@ export function useCharterQuery(id: string) {
   return useQuery<CharterData | null>({
     queryKey: ["charter", id],
     queryFn: async () => {
-      const res = await fetch(`http://localhost:5000/api/programmes/${id}/charter`);
+      const res = await fetch(`/api-proxy/programmes/${id}/charter`);
       if (!res.ok) throw new Error("Failed to fetch");
       return res.json();
     },
@@ -94,7 +94,7 @@ export function useJourneyQuery(id: string) {
   return useQuery<JourneyData | null>({
     queryKey: ["journey", id],
     queryFn: async () => {
-      const res = await fetch(`http://localhost:5000/api/journey?programme_id=${id}`);
+      const res = await fetch(`/api-proxy/journey?programme_id=${id}`);
       if (!res.ok) throw new Error("Failed to fetch");
       return res.json();
     },
@@ -106,7 +106,7 @@ export function useDpdsGatesQuery(id: string) {
   return useQuery<Record<string, DpdsGateInfo>>({
     queryKey: ["dpdsGates", id],
     queryFn: async () => {
-      const res = await fetch(`http://localhost:5000/api/dpds/gates?programme_id=${id}`);
+      const res = await fetch(`/api-proxy/dpds/gates?programme_id=${id}`);
       if (!res.ok) throw new Error("Failed to fetch DPDS gates");
       return res.json();
     },
@@ -120,7 +120,7 @@ export function useTasksQuery(id: string) {
   return useQuery<Task[]>({
     queryKey: ["tasks", id],
     queryFn: async () => {
-      const res = await fetch(`http://localhost:5000/api/tasks/programme/${id}`);
+      const res = await fetch(`/api-proxy/tasks/programme/${id}`);
       if (!res.ok) throw new Error("Failed to fetch tasks");
       const data = await res.json();
       setTasks(data, id);
@@ -137,7 +137,7 @@ export function useEvmReportQuery(id: string, week?: number) {
   return useQuery<EvmReport>({
     queryKey: ["evmReport", id, week],
     queryFn: async () => {
-      const res = await fetch(`http://localhost:5000/api/tasks/programme/${id}`);
+      const res = await fetch(`/api-proxy/tasks/programme/${id}`);
       if (!res.ok) throw new Error("Failed to fetch tasks");
       const data = await res.json();
       setTasks(data, id);
@@ -154,7 +154,7 @@ export function useHeatmapReportQuery(id: string) {
   return useQuery<HeatmapReport>({
     queryKey: ["heatmapReport", id],
     queryFn: async () => {
-      const res = await fetch(`http://localhost:5000/api/tasks/programme/${id}`);
+      const res = await fetch(`/api-proxy/tasks/programme/${id}`);
       if (!res.ok) throw new Error("Failed to fetch tasks");
       const data = await res.json();
       setTasks(data, id);
@@ -180,7 +180,7 @@ export function useMilestonesQuery(pid: string) {
   return useQuery<Milestone[]>({
     queryKey: ["milestones", pid],
     queryFn: async () => {
-      const res = await fetch(`http://localhost:5000/api/milestones?programme_id=${pid}`);
+      const res = await fetch(`/api-proxy/milestones?programme_id=${pid}`);
       if (!res.ok) throw new Error("Failed to fetch");
       return res.json();
     },
@@ -205,7 +205,7 @@ export function useRisksQuery(pid: string) {
   return useQuery<Risk[]>({
     queryKey: ["risks", pid],
     queryFn: async () => {
-      const res = await fetch(`http://localhost:5000/api/risks?programme_id=${pid}`);
+      const res = await fetch(`/api-proxy/risks?programme_id=${pid}`);
       if (!res.ok) throw new Error("Failed to fetch");
       return res.json();
     },
@@ -437,7 +437,7 @@ export function usePeopleQuery() {
   return useQuery<Person[]>({
     queryKey: ["people"],
     queryFn: async () => {
-      const res = await fetch("http://localhost:5000/api/people");
+      const res = await fetch("/api-proxy/people");
       if (!res.ok) throw new Error("Failed to fetch people");
       return res.json();
     }
@@ -448,7 +448,7 @@ export function useCreatePersonMutation() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (data: Omit<Person, "id">) => {
-      const res = await fetch("http://localhost:5000/api/people", {
+      const res = await fetch("/api-proxy/people", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(data),
@@ -464,7 +464,7 @@ export function useUpdatePersonMutation() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({ id, ...data }: Partial<Person> & { id: string }) => {
-      const res = await fetch(`http://localhost:5000/api/people/${id}`, {
+      const res = await fetch(`/api-proxy/people/${id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(data),
@@ -480,7 +480,7 @@ export function useUsersQuery() {
   return useQuery<User[]>({
     queryKey: ["users"],
     queryFn: async () => {
-      const res = await fetch("http://localhost:5000/api/manage/users");
+      const res = await fetch("/api-proxy/manage/users");
       if (!res.ok) throw new Error("Failed to fetch users");
       return res.json();
     }
@@ -491,7 +491,7 @@ export function useCreateUserMutation() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (data: Omit<User, "id">) => {
-      const res = await fetch("http://localhost:5000/api/manage/users", {
+      const res = await fetch("/api-proxy/manage/users", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(data),
@@ -510,7 +510,7 @@ export function useUpdateUserMutation() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({ id, ...data }: Partial<User> & { id: string }) => {
-      const res = await fetch(`http://localhost:5000/api/manage/users/${id}`, {
+      const res = await fetch(`/api-proxy/manage/users/${id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(data),
@@ -564,7 +564,7 @@ export function useTimeEntriesQuery() {
   return useQuery<TimeEntry[]>({
     queryKey: ["timeEntries"],
     queryFn: async () => {
-      const res = await fetch("http://localhost:5000/api/time");
+      const res = await fetch("/api-proxy/time");
       if (!res.ok) throw new Error("Failed to fetch time entries");
       const data = await res.json();
       setTimeEntries(data);
@@ -577,7 +577,7 @@ export function useTimesheetReportQuery(weeks: number, pid?: string) {
   return useQuery<any>({
     queryKey: ["timesheetReport", weeks, pid],
     queryFn: async () => {
-      let url = `http://localhost:5000/api/reports/timesheet?weeks=${weeks}`;
+      let url = `/api-proxy/reports/timesheet?weeks=${weeks}`;
       if (pid) {
         url += `&programme_id=${encodeURIComponent(pid)}`;
       }

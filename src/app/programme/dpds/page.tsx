@@ -68,7 +68,7 @@ export default function DpdsGatesPage() {
     if (!newItemName.trim() || !addingToGate) return;
 
     try {
-      const res = await fetch("http://localhost:5000/api/dpds/deliverables", {
+      const res = await fetch("/api-proxy/dpds/deliverables", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -94,7 +94,7 @@ export default function DpdsGatesPage() {
     if (!carryoverSource) return;
 
     try {
-      const res = await fetch("http://localhost:5000/api/dpds/carryover", {
+      const res = await fetch("/api-proxy/dpds/carryover", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -311,7 +311,7 @@ export default function DpdsGatesPage() {
                               checked={isCompleted} 
                               onChange={async (e) => {
                                 try {
-                                  const res = await fetch(`http://localhost:5000/api/dpds/deliverables/${d.id}`, {
+                                  const res = await fetch(`/api-proxy/dpds/deliverables/${d.id}`, {
                                     method: "PUT",
                                     headers: { "Content-Type": "application/json" },
                                     body: JSON.stringify({ completed: e.target.checked })
@@ -358,7 +358,7 @@ export default function DpdsGatesPage() {
                             <button 
                               onClick={async () => {
                                 try {
-                                  const res = await fetch(`http://localhost:5000/api/dpds/deliverables/${d.id}`, {
+                                  const res = await fetch(`/api-proxy/dpds/deliverables/${d.id}`, {
                                     method: "DELETE"
                                   });
                                   if (!res.ok) throw new Error("Failed to delete deliverable");
@@ -404,7 +404,7 @@ export default function DpdsGatesPage() {
                           onClick={async () => {
                             if (!isEditor) return;
                             try {
-                              const res = await fetch("http://localhost:5000/api/dpds/dmaic/cycle", {
+                              const res = await fetch("/api-proxy/dpds/dmaic/cycle", {
                                 method: "POST",
                                 headers: { "Content-Type": "application/json" },
                                 body: JSON.stringify({

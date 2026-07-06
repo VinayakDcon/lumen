@@ -1312,7 +1312,7 @@ export const usePmoStore = create<PmoState>((set, get) => ({
   loadPeople: async () => {
     if (get().peopleLoaded) return;
     try {
-      const res = await fetch('http://localhost:5000/api/people');
+      const res = await fetch('/api-proxy/people');
       if (!res.ok) {
         console.warn(`[loadPeople] Backend returned ${res.status} — is the server running on port 5000?`);
         return;
@@ -2166,7 +2166,7 @@ export const usePmoStore = create<PmoState>((set, get) => ({
   }),
   addTimeEntry: async (entry) => {
     try {
-      const res = await fetch("http://localhost:5000/api/time", {
+      const res = await fetch("/api-proxy/time", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(entry)
@@ -2183,7 +2183,7 @@ export const usePmoStore = create<PmoState>((set, get) => ({
   },
   deleteTimeEntry: async (id) => {
     try {
-      const res = await fetch(`http://localhost:5000/api/time/${id}`, {
+      const res = await fetch(`/api-proxy/time/${id}`, {
         method: "DELETE"
       });
       if (res.ok) {
@@ -2199,7 +2199,7 @@ export const usePmoStore = create<PmoState>((set, get) => ({
   submitTimesheetWeek: async (personId, weekStart) => {
     try {
       const cleanPersonId = typeof personId === 'string' ? parseInt(personId.replace('person-', '')) : personId;
-      const res = await fetch("http://localhost:5000/api/my/timesheet/submit", {
+      const res = await fetch("/api-proxy/my/timesheet/submit", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ person_id: cleanPersonId, week: weekStart })
@@ -2219,7 +2219,7 @@ export const usePmoStore = create<PmoState>((set, get) => ({
   },
   approveTimesheetSubmission: async (id, approvedBy) => {
     try {
-      const res = await fetch(`http://localhost:5000/api/my/timesheet/${id}/approve`, {
+      const res = await fetch(`/api-proxy/my/timesheet/${id}/approve`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action: "approve", reviewer: approvedBy })
@@ -2236,7 +2236,7 @@ export const usePmoStore = create<PmoState>((set, get) => ({
   },
   rejectTimesheetSubmission: async (id, approvedBy, rejectionNotes) => {
     try {
-      const res = await fetch(`http://localhost:5000/api/my/timesheet/${id}/approve`, {
+      const res = await fetch(`/api-proxy/my/timesheet/${id}/approve`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action: "reject", notes: rejectionNotes, reviewer: approvedBy })
@@ -2268,7 +2268,7 @@ export const usePmoStore = create<PmoState>((set, get) => ({
   }),
   addTask: async (task: Task) => {
     try {
-      const res = await fetch("http://localhost:5000/api/tasks", {
+      const res = await fetch("/api-proxy/tasks", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(task)
@@ -2298,7 +2298,7 @@ export const usePmoStore = create<PmoState>((set, get) => ({
   },
   updateTask: async (wbs: string, updates: Partial<Task>) => {
     try {
-      const res = await fetch(`http://localhost:5000/api/tasks/${wbs}`, {
+      const res = await fetch(`/api-proxy/tasks/${wbs}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(updates)
@@ -2338,7 +2338,7 @@ export const usePmoStore = create<PmoState>((set, get) => ({
   },
   deleteTask: async (wbs: string) => {
     try {
-      const res = await fetch(`http://localhost:5000/api/tasks/${wbs}`, {
+      const res = await fetch(`/api-proxy/tasks/${wbs}`, {
         method: "DELETE"
       });
       if (res.ok) {

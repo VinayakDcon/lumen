@@ -48,7 +48,7 @@ export default function SessionSync() {
 
       try {
         const res = await fetch(
-          `http://localhost:5000/api/me?email=${encodeURIComponent(email)}`
+          `/api-proxy/me?email=${encodeURIComponent(email)}`
         );
         if (!res.ok) throw new Error("Failed to fetch /api/me");
         const me: MeResponse = await res.json();
