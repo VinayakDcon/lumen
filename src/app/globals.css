@@ -23,15 +23,31 @@
   --color-grey-700: #374151;
   --color-grey-900: #1F2937;
   
-  --color-bg-base: #F8FAFC;
-  --color-border-base: #E2E8F0;
+  --color-bg-base: var(--background);
+  --color-border-base: var(--border-color);
 }
 
 :root {
-  --background: #F8FAFC;
+  --background: #FAFAFA; /* Ghost White */
+  --background-secondary: #F1F5F9;
+  --card-bg: #FFFFFF;
+  --sidebar-bg: #0D1B2E;
+  --table-header-bg: #0D1B2E;
+  --border-color: #E2E8F0;
+  
+  --primary-btn: #1E90E8;
+  --primary-btn-hover: #0B5BAF;
+  
+  --text-primary: #0D1B2E;
+  --text-secondary: #475569;
+  --text-muted: #94A3B8;
+
   --foreground: #0F172A;
   --font-sans: var(--font-geist-sans), system-ui, -apple-system, sans-serif;
+  --clay-shadow: inset 3px 3px 6px rgba(255, 255, 255, 0.85), inset -3px -3px 6px rgba(203, 213, 225, 0.2), 0 10px 25px -5px rgba(15, 23, 42, 0.03), 0 8px 10px -6px rgba(15, 23, 42, 0.03);
 }
+
+
 
 body {
   background-color: var(--background);
@@ -41,6 +57,7 @@ body {
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  transition: background-color 0.2s ease, color 0.2s ease;
 }
 
 /* Custom Scrollbars */
@@ -52,11 +69,11 @@ body {
   background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: #CBD5E1;
+  background: var(--border-color);
   border-radius: 3px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #94A3B8;
+  background: var(--text-muted);
 }
 
 /* Micro-animations */
@@ -84,8 +101,8 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  background-color: #F1F5F9;
-  color: #94A3B8;
+  background-color: var(--background-secondary);
+  color: var(--text-muted);
   font-size: 12px;
   border-radius: 4px;
 }
@@ -96,4 +113,157 @@ body {
   max-width: 1600px;
   margin: 0 auto;
   width: 100%;
+}
+
+/* Claymorphic Buttons */
+.btn-primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background-color: var(--primary-btn) !important;
+  color: white !important;
+  font-weight: 700;
+  font-size: 13px;
+  padding: 8px 16px;
+  border-radius: 8px;
+  border: 2px solid var(--primary-btn-hover) !important;
+  box-shadow: 
+    inset 2px 2px 4px rgba(255, 255, 255, 0.25), 
+    inset -2px -2px 4px rgba(0, 0, 0, 0.15),
+    0 4px 6px rgba(37, 99, 235, 0.15);
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.btn-primary:hover {
+  background-color: var(--primary-btn-hover) !important;
+  transform: translateY(-1px);
+  box-shadow: 
+    inset 2px 2px 4px rgba(255, 255, 255, 0.3), 
+    inset -2px -2px 4px rgba(0, 0, 0, 0.2),
+    0 6px 12px rgba(37, 99, 235, 0.25);
+}
+
+.btn-primary:active {
+  transform: translateY(1px);
+  box-shadow: 
+    inset 1px 1px 2px rgba(255, 255, 255, 0.2), 
+    inset -1px -1px 2px rgba(0, 0, 0, 0.1);
+}
+
+.btn-secondary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background-color: var(--background-secondary) !important;
+  color: var(--text-secondary) !important;
+  font-weight: 700;
+  font-size: 13px;
+  padding: 8px 16px;
+  border-radius: 8px;
+  border: 1px solid var(--border-color) !important;
+  box-shadow: 
+    inset 1px 1px 2px rgba(255, 255, 255, 0.1),
+    inset -1px -1px 2px rgba(0, 0, 0, 0.05);
+  cursor: pointer;
+  transition: all 0.2s ease-in-out;
+}
+
+.btn-secondary:hover {
+  background-color: var(--border-color) !important;
+  color: var(--text-primary) !important;
+  box-shadow: 
+    inset 1px 1px 2px rgba(255, 255, 255, 0.2),
+    inset -1px -1px 2px rgba(0, 0, 0, 0.08);
+}
+
+/* Claymorphic Sub-sections & Cards */
+.clay-card {
+  background-color: var(--card-bg) !important;
+  border-radius: 16px;
+  border: 1px solid var(--border-color) !important;
+  box-shadow: var(--clay-shadow) !important;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.clay-card:hover {
+  transform: translateY(-2px);
+  border-color: rgba(30, 144, 232, 0.3) !important;
+}
+
+/* Automatically style all standard card layout containers all over the site with Claymorphism */
+.bg-white.rounded-xl.shadow-sm.border.border-slate-200 {
+  background-color: var(--card-bg) !important;
+  border-radius: 16px !important;
+  border: 1px solid var(--border-color) !important;
+  box-shadow: var(--clay-shadow) !important;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.bg-white.rounded-xl.shadow-sm.border.border-slate-200:hover {
+  transform: translateY(-2px);
+  border-color: rgba(30, 144, 232, 0.3) !important;
+}
+
+/* Global Component Class Overrides for Theme Sync */
+header {
+  background-color: var(--card-bg) !important;
+  border-color: var(--border-color) !important;
+}
+
+aside {
+  background-color: var(--sidebar-bg) !important;
+  border-color: var(--border-color) !important;
+}
+
+main {
+  background-color: var(--background) !important;
+}
+
+thead tr {
+  background-color: var(--table-header-bg) !important;
+  color: #C9A95A !important; /* Gold text */
+}
+
+/* Global text utility matching overrides for dark mode */
+.text-navy,
+.text-slate-900,
+.dark .text-navy,
+.dark .text-slate-900 {
+  color: var(--text-primary) !important;
+}
+
+.text-slate-700,
+.text-slate-600 {
+  color: var(--text-secondary) !important;
+}
+
+.text-slate-500,
+.text-slate-400 {
+  color: var(--text-muted) !important;
+}
+
+/* Global border overlays */
+.border-slate-100,
+.border-slate-150,
+.border-slate-200,
+.border-slate-250,
+.border-slate-300 {
+  border-color: var(--border-color) !important;
+}
+
+.divide-slate-100 > :not([hidden]) ~ :not([hidden]),
+.divide-slate-200 > :not([hidden]) ~ :not([hidden]) {
+  border-color: var(--border-color) !important;
+}
+
+.bg-slate-50,
+.bg-slate-50\/20,
+.bg-slate-50\/50,
+.bg-slate-100 {
+  background-color: var(--background-secondary) !important;
+}
+
+.bg-white {
+  background-color: var(--card-bg) !important;
 }

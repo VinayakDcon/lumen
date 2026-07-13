@@ -602,6 +602,7 @@ export function ProgrammeWizard() {
                   >
                     <option value="PLANNING">PLANNING</option>
                     <option value="ACTIVE">ACTIVE</option>
+                    <option value="RFQ_RESPONSE">RFQ_RESPONSE (pre-award)</option>
                     <option value="ON_HOLD">ON HOLD</option>
                     <option value="CLOSED">CLOSED</option>
                   </select>

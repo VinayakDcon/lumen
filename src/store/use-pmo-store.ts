@@ -13,10 +13,7 @@ const mockUser: User = {
   person_id: 'person-2'
 };
 
-import mockTasksJson from './mock-tasks.json';
-import mockResourcesJson from './mock-resources.json';
-
-export const mockResources = mockResourcesJson as any[];
+export const mockResources: any[] = [];
 
 const customMy22Tasks: Task[] = [
   {
@@ -175,32 +172,7 @@ const customMy22Tasks: Task[] = [
   }
 ];
 
-const seededTasks: Task[] = (mockTasksJson as any[]).map(t => ({
-  wbs: t.wbs,
-  programme_id: t.programme_id,
-  name: t.name,
-  phase: t.phase || 'G0',
-  part: t.part || 'ALL',
-  discipline: t.discipline || 'PM',
-  weeks: (t.finish_wk - t.start_wk + 1) || 1,
-  plan_hr: t.effort_hr || 0,
-  effort_hr: t.effort_hr || 0,
-  actual_hr: t.actual_hr || 0,
-  blocked_hr: t.blocked_hr || 0,
-  resources: t.resources || '',
-  reviewer: '',
-  status: (t.status || 'NOT STARTED') as TaskStatus,
-  percent_complete: t.percent_complete || 0,
-  approval_status: (t.approval_status || 'NOT_REQUIRED') as any,
-  level: t.level || 3,
-  wbs_sort: t.wbs_sort || t.wbs,
-  start_wk: t.start_wk || 1,
-  finish_wk: t.finish_wk || 1,
-  blocker_reason: t.blocker_reason || '',
-  blocker_note: t.blocker_note || '',
-  cost_inr: t.cost_inr || 0,
-  updated_at: t.updated_at
-})).filter(t => t.programme_id !== 'MY_22');
+const seededTasks: Task[] = [];
 
 const mockTasks: Task[] = [...seededTasks, ...customMy22Tasks];
 
@@ -684,6 +656,7 @@ interface PmoState {
   closeMobileSidebar: () => void;
   markNotificationRead: (id: number) => void;
   markAllNotificationsRead: () => void;
+  setNotifications: (notifications: Notification[]) => void;
   getDashboardMetrics: () => DashboardMetrics | null;
   getScurveData: (pid: string) => ScurvePoint[];
   getFollowUpTasks: (pid: string) => FollowUpTask[];
@@ -1627,12 +1600,30 @@ export const usePmoStore = create<PmoState>((set, get) => ({
   toggleSidebar: () => set((state) => ({ sidebarCollapsed: !state.sidebarCollapsed })),
   toggleMobileSidebar: () => set((state) => ({ mobileSidebarOpen: !state.mobileSidebarOpen })),
   closeMobileSidebar: () => set({ mobileSidebarOpen: false }),
-  markNotificationRead: (id) => set((state) => ({
-    notifications: state.notifications.map(n => n.id === id ? { ...n, read: true } : n)
-  })),
-  markAllNotificationsRead: () => set((state) => ({
-    notifications: state.notifications.map(n => ({ ...n, read: true }))
-  })),
+  markNotificationRead: async (id) => {
+    set((state) => ({
+      notifications: state.notifications.map(n => n.id === id ? { ...n, read: true } : n)
+    }));
+    try {
+      await fetch(`/api-proxy/notifications/${id}/read`, { method: "PUT" });
+    } catch (e) {
+      console.error("Failed to mark notification as read in backend:", e);
+    }
+  },
+  markAllNotificationsRead: async () => {
+    const userEmail = get().user?.email;
+    set((state) => ({
+      notifications: state.notifications.map(n => ({ ...n, read: true }))
+    }));
+    if (userEmail) {
+      try {
+        await fetch(`/api-proxy/notifications/read-all?email=${encodeURIComponent(userEmail)}`, { method: "PUT" });
+      } catch (e) {
+        console.error("Failed to mark all notifications as read in backend:", e);
+      }
+    }
+  },
+  setNotifications: (notifications) => set({ notifications }),
   getDashboardMetrics: () => {
     const activeId = get().activeProgrammeId;
     const progs = get().programmes;
@@ -2370,7 +2361,12 @@ export const usePmoStore = create<PmoState>((set, get) => ({
   getEvmReport: (pid: string, week?: number) => {
     const state = get();
     const tasks = state.tasks.filter(t => t.programme_id === pid && t.level === 3 && (t.effort_hr || t.plan_hr || 0) > 0);
-    const resources = mockResources;
+    const resources = state.people.map(p => ({
+      id: p.resource_id || p.id.toString(),
+      name: p.name,
+      capacity_hr_per_wk: p.weekly_target_hr || 45,
+      rate_inr: 0
+    }));
     const rateMap: Record<string, number> = {};
     for (const r of resources) {
       rateMap[r.id] = r.rate_inr;
@@ -2457,8 +2453,15 @@ export const usePmoStore = create<PmoState>((set, get) => ({
     const prog = state.programmes.find(p => p.id === pid);
     const weeks = prog?.programme_weeks || 56;
 
+    const resources = state.people.map(p => ({
+      id: p.resource_id || p.id.toString(),
+      name: p.name,
+      capacity_hr_per_wk: p.weekly_target_hr || 45,
+      rate_inr: 0
+    }));
+
     const matrix: Record<string, { name: string; capacity_hr_per_wk: number; weekly: number[] }> = {};
-    for (const r of mockResources) {
+    for (const r of resources) {
       matrix[r.id] = {
         name: r.name,
         capacity_hr_per_wk: r.capacity_hr_per_wk || 45,
@@ -2477,7 +2480,7 @@ export const usePmoStore = create<PmoState>((set, get) => ({
 
       const hrPerWkPerRes = effort / dur / resList.length;
       for (const rId of resList) {
-        for (const r of mockResources) {
+        for (const r of resources) {
           if (rId === r.id || rId.toLowerCase().includes(r.name.toLowerCase()) || r.name.toLowerCase().includes(rId.toLowerCase())) {
             for (let w = start; w <= Math.min(finish, weeks); w++) {
               if (matrix[r.id]) {

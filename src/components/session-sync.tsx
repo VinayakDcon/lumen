@@ -37,6 +37,20 @@ export default function SessionSync() {
       return;
     }
 
+    let pollingInterval: NodeJS.Timeout | null = null;
+
+    const fetchNotifications = async (email: string) => {
+      try {
+        const res = await fetch(`/api-proxy/notifications?email=${encodeURIComponent(email)}`);
+        if (res.ok) {
+          const data = await res.json();
+          usePmoStore.getState().setNotifications(data);
+        }
+      } catch (err) {
+        console.error("[SessionSync] Failed to fetch notifications:", err);
+      }
+    };
+
     const syncUser = async () => {
       // Get email from session (real MS Auth) OR from mock (auth.ts bypass)
       const email =
@@ -74,6 +88,19 @@ export default function SessionSync() {
         // null = full access, [] = no access, [...] = specific programmes
         store.setAssignedProgrammeIds(me.assigned_programme_ids);
 
+        if (me.assigned_programme_ids && me.assigned_programme_ids.length > 0) {
+          if (!me.assigned_programme_ids.includes(store.activeProgrammeId)) {
+            store.switchProgramme(me.assigned_programme_ids[0]);
+          }
+        }
+
+        // Fetch notifications initially and start polling
+        await fetchNotifications(email);
+        
+        pollingInterval = setInterval(() => {
+          fetchNotifications(email);
+        }, 5000);
+
       } catch (err) {
         console.error("[SessionSync] Could not resolve user from /api/me:", err);
         // Fallback: at minimum push session role into store if available
@@ -88,6 +115,12 @@ export default function SessionSync() {
     };
 
     syncUser();
+
+    return () => {
+      if (pollingInterval) {
+        clearInterval(pollingInterval);
+      }
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [status, session?.user?.email, (session as any)?.role, router]);
 

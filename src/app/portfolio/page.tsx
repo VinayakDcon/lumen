@@ -169,7 +169,7 @@ export default function PortfolioPage() {
   const handleDeleteProgramme = (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
     if (confirm(`Are you sure you want to delete programme "${id}"?`)) {
-      fetch(`/api/programmes/${id}`, { method: "DELETE" }).then(() => {
+      fetch(`/api-proxy/programmes/${id}`, { method: "DELETE" }).then(() => {
         alert(`Deleted programme ${id}`);
         window.location.reload();
       }).catch(() => {

@@ -69,13 +69,15 @@ interface MiniCalendarProps {
   selectedWeekMonday?: Date;
   /** In 'leave' mode: these dates are highlighted as leave days. */
   leaveDays?: Set<string>;
-  mode: "week" | "leave";
+  wfhDays?: Set<string>;
+  halfDays?: Map<string, "first" | "second">;
+  mode: "week" | "leave" | "wfh" | "half";
   todayStr: string;
 }
 
 function MiniCalendar({
   viewMonth, onViewMonthChange, onDateClick,
-  selectedWeekMonday, leaveDays, mode, todayStr
+  selectedWeekMonday, leaveDays, wfhDays, halfDays, mode, todayStr
 }: MiniCalendarProps) {
   const year = viewMonth.getFullYear();
   const month = viewMonth.getMonth();
@@ -144,6 +146,8 @@ function MiniCalendar({
               const dStr    = toYMD(d);
               const isToday = dStr === todayStr;
               const isLeave = leaveDays?.has(dStr) ?? false;
+              const isWfh   = wfhDays?.has(dStr) ?? false;
+              const isHalf  = halfDays?.has(dStr) ?? false;
               const inWeek  = mode === "week" && selStart && dStr >= selStart && dStr <= selEnd;
               const isWkEnd = d.getDay() === 0 || d.getDay() === 6;
 
@@ -156,6 +160,10 @@ function MiniCalendar({
                     "flex items-center justify-center text-[11px] font-semibold h-8 w-full rounded transition-all",
                     isLeave
                       ? "bg-orange-200 text-orange-700 font-black hover:bg-orange-300"
+                      : isWfh
+                      ? "bg-blue-100 text-blue-700 font-black hover:bg-blue-200"
+                      : isHalf
+                      ? "bg-amber-100 text-amber-700 font-black hover:bg-amber-200"
                       : isToday
                       ? "bg-slate-300 text-slate-800 font-black hover:bg-slate-400"
                       : inWeek
@@ -204,14 +212,31 @@ export default function MyTimesheetPage() {
   // Leave days: Set of YYYY-MM-DD strings
   const [leaveDays, setLeaveDays] = useState<Set<string>>(new Set());
 
+  const [showWfhCal,  setShowWfhCal]  = useState(false);
+  const [wfhCalMonth, setWfhCalMonth] = useState<Date>(() => new Date());
+
+  // WFH days: Set of YYYY-MM-DD strings
+  const [wfhDays, setWfhDays] = useState<Set<string>>(new Set());
+
+  const [showHalfDayCal,  setShowHalfDayCal]  = useState(false);
+  const [halfDayCalMonth, setHalfDayCalMonth] = useState<Date>(() => new Date());
+  const [pendingHalfDayDate, setPendingHalfDayDate] = useState<string | null>(null);
+
+  // Half day leaves: Map YYYY-MM-DD -> 'first' | 'second'
+  const [halfDays, setHalfDays] = useState<Map<string, "first" | "second">>(new Map());
+
   // Refs for click-outside dismissal
-  const weekCalRef  = useRef<HTMLDivElement>(null);
-  const leaveCalRef = useRef<HTMLDivElement>(null);
+  const weekCalRef     = useRef<HTMLDivElement>(null);
+  const leaveCalRef    = useRef<HTMLDivElement>(null);
+  const wfhCalRef      = useRef<HTMLDivElement>(null);
+  const halfDayCalRef  = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
       if (weekCalRef.current  && !weekCalRef.current.contains(e.target as Node))  setShowWeekCal(false);
       if (leaveCalRef.current && !leaveCalRef.current.contains(e.target as Node)) setShowLeaveCal(false);
+      if (wfhCalRef.current   && !wfhCalRef.current.contains(e.target as Node))   setShowWfhCal(false);
+      if (halfDayCalRef.current && !halfDayCalRef.current.contains(e.target as Node)) setShowHalfDayCal(false);
     };
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
@@ -278,7 +303,8 @@ export default function MyTimesheetPage() {
 
   // Count leave days falling inside this week, then adjust targets
   const weekLeaveCount = weekDates.filter(d => leaveDays.has(toYMD(d))).length;
-  const targetTotal    = Math.max(0, 45 - weekLeaveCount * 9);
+  const weekHalfDayCount = weekDates.filter(d => halfDays.has(toYMD(d))).length;
+  const targetTotal    = Math.max(0, 45 - (weekLeaveCount * 9) - (weekHalfDayCount * 4.5));
   const targetBillable = 36; // sub-targets stay fixed; total target changes
   const targetBau      = 9;
 
@@ -323,6 +349,39 @@ export default function MyTimesheetPage() {
       next.has(ds) ? next.delete(ds) : next.add(ds);
       return next;
     });
+  };
+
+  const handleWfhCalClick = (d: Date) => {
+    const ds = toYMD(d);
+    setWfhDays(prev => {
+      const next = new Set(prev);
+      next.has(ds) ? next.delete(ds) : next.add(ds);
+      return next;
+    });
+  };
+
+  const handleHalfDayCalClick = (d: Date) => {
+    const ds = toYMD(d);
+    if (halfDays.has(ds)) {
+      setHalfDays(prev => {
+        const next = new Map(prev);
+        next.delete(ds);
+        return next;
+      });
+    } else {
+      setPendingHalfDayDate(ds);
+    }
+  };
+
+  const handleSelectHalf = (type: "first" | "second") => {
+    if (pendingHalfDayDate) {
+      setHalfDays(prev => {
+        const next = new Map(prev);
+        next.set(pendingHalfDayDate, type);
+        return next;
+      });
+      setPendingHalfDayDate(null);
+    }
   };
 
   const handleLogTime = (e: React.FormEvent) => {
@@ -508,6 +567,162 @@ export default function MyTimesheetPage() {
             )}
           </div>
 
+          {/* Log Work From Home button + calendar popup */}
+          <div className="relative" ref={wfhCalRef}>
+            <button
+              onClick={() => { setWfhCalMonth(new Date()); setShowWfhCal(v => !v); }}
+              className={cn(
+                "border px-4 py-2 rounded text-xs font-bold cursor-pointer transition-all flex items-center gap-1.5",
+                wfhDays.size > 0
+                  ? "border-blue-300 bg-blue-50 text-blue-700 hover:bg-blue-100 shadow-sm"
+                  : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
+              )}
+            >
+              <CalendarDays className="w-4 h-4" />
+              <span>Log Work From Home</span>
+              {wfhDays.size > 0 && (
+                <span className="bg-blue-200 text-blue-800 rounded-full px-1.5 py-0.5 text-[9px] font-black leading-none">
+                  {wfhDays.size}
+                </span>
+              )}
+            </button>
+
+            {showWfhCal && (
+              <div className="absolute top-full right-0 mt-2 bg-white border border-slate-200 rounded-xl shadow-2xl z-50" style={{ minWidth: 264 }}>
+                <div className="flex items-center justify-between px-3 pt-3 pb-2 border-b border-slate-100">
+                  <div>
+                    <div className="text-[11px] font-black text-slate-700">Mark WFH Days</div>
+                    <div className="text-[9px] text-slate-400 font-semibold mt-0.5">
+                      Click a date to toggle · Does not deduct hours
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => setShowWfhCal(false)}
+                    className="text-slate-400 hover:text-slate-600 transition-colors ml-3"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+
+                <MiniCalendar
+                  viewMonth={wfhCalMonth}
+                  onViewMonthChange={setWfhCalMonth}
+                  onDateClick={handleWfhCalClick}
+                  wfhDays={wfhDays}
+                  mode="wfh"
+                  todayStr={todayStr}
+                />
+
+                {wfhDays.size > 0 && (
+                  <div className="px-3 pb-3 pt-2 border-t border-slate-100 flex items-center justify-between">
+                    <span className="text-[10px] text-slate-500 font-semibold">
+                      {wfhDays.size} day{wfhDays.size > 1 ? "s" : ""} marked
+                    </span>
+                    <button
+                      onClick={() => setWfhDays(new Set())}
+                      className="text-[10px] text-dc-blue font-bold hover:underline"
+                    >
+                      Clear all
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Log Half Day button + calendar popup */}
+          <div className="relative" ref={halfDayCalRef}>
+            <button
+              onClick={() => { setHalfDayCalMonth(new Date()); setShowHalfDayCal(v => !v); setPendingHalfDayDate(null); }}
+              className={cn(
+                "border px-4 py-2 rounded text-xs font-bold cursor-pointer transition-all flex items-center gap-1.5",
+                halfDays.size > 0
+                  ? "border-amber-300 bg-amber-50 text-amber-700 hover:bg-amber-100 shadow-sm"
+                  : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
+              )}
+            >
+              <BriefcaseMedical className="w-4 h-4" />
+              <span>Log Half Day</span>
+              {halfDays.size > 0 && (
+                <span className="bg-amber-200 text-amber-800 rounded-full px-1.5 py-0.5 text-[9px] font-black leading-none">
+                  {halfDays.size}
+                </span>
+              )}
+            </button>
+
+            {showHalfDayCal && (
+              <div className="absolute top-full right-0 mt-2 bg-white border border-slate-200 rounded-xl shadow-2xl z-50" style={{ minWidth: 264 }}>
+                <div className="flex items-center justify-between px-3 pt-3 pb-2 border-b border-slate-100">
+                  <div>
+                    <div className="text-[11px] font-black text-slate-700">Mark Half Day Leaves</div>
+                    <div className="text-[9px] text-slate-400 font-semibold mt-0.5">
+                      Click a date to toggle · 4.5 hr deducted per half day
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => { setShowHalfDayCal(false); setPendingHalfDayDate(null); }}
+                    className="text-slate-400 hover:text-slate-600 transition-colors ml-3"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+
+                <div className="relative">
+                  <MiniCalendar
+                    viewMonth={halfDayCalMonth}
+                    onViewMonthChange={setHalfDayCalMonth}
+                    onDateClick={handleHalfDayCalClick}
+                    halfDays={halfDays}
+                    mode="half"
+                    todayStr={todayStr}
+                  />
+
+                  {pendingHalfDayDate && (
+                    <div className="absolute inset-0 bg-white/95 flex flex-col items-center justify-center p-4 z-10 rounded-xl">
+                      <div className="text-xs font-black text-navy mb-3 text-center">
+                        Select half for {pendingHalfDayDate}
+                      </div>
+                      <div className="flex flex-col gap-2 w-full max-w-[180px]">
+                        <button
+                          onClick={() => handleSelectHalf("first")}
+                          className="bg-amber-500 hover:bg-amber-600 text-white text-[11px] font-bold py-1.5 px-3 rounded shadow-sm transition-colors text-center"
+                        >
+                          First Half (Morning)
+                        </button>
+                        <button
+                          onClick={() => handleSelectHalf("second")}
+                          className="bg-amber-500 hover:bg-amber-600 text-white text-[11px] font-bold py-1.5 px-3 rounded shadow-sm transition-colors text-center"
+                        >
+                          Second Half (Afternoon)
+                        </button>
+                        <button
+                          onClick={() => setPendingHalfDayDate(null)}
+                          className="border border-slate-200 hover:bg-slate-50 text-slate-500 text-[10px] font-bold py-1 px-3 rounded transition-colors text-center mt-1"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {halfDays.size > 0 && (
+                  <div className="px-3 pb-3 pt-2 border-t border-slate-100 flex items-center justify-between">
+                    <span className="text-[10px] text-slate-500 font-semibold">
+                      {halfDays.size} day{halfDays.size > 1 ? "s" : ""} marked
+                    </span>
+                    <button
+                      onClick={() => setHalfDays(new Map())}
+                      className="text-[10px] text-danger-red font-bold hover:underline"
+                    >
+                      Clear all
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
           {/* Submit Week */}
           <button
             onClick={handleSubmitWeek}
@@ -541,6 +756,14 @@ export default function MyTimesheetPage() {
                 <span className="text-[9px] bg-orange-100 text-orange-600 font-bold px-1.5 py-0.5 rounded border border-orange-200 inline-flex items-center gap-1">
                   <BriefcaseMedical className="w-2.5 h-2.5" />
                   {weekLeaveCount} leave day{weekLeaveCount > 1 ? "s" : ""} this week
+                </span>
+              </div>
+            )}
+            {weekHalfDayCount > 0 && (
+              <div className="mt-1">
+                <span className="text-[9px] bg-amber-100 text-amber-600 font-bold px-1.5 py-0.5 rounded border border-amber-200 inline-flex items-center gap-1">
+                  <BriefcaseMedical className="w-2.5 h-2.5" />
+                  {weekHalfDayCount} half day{weekHalfDayCount > 1 ? "s" : ""} this week
                 </span>
               </div>
             )}
@@ -713,6 +936,8 @@ export default function MyTimesheetPage() {
           const isToday     = dateStr === todayStr;
           const isWeekend   = dateObj.getDay() === 0 || dateObj.getDay() === 6;
           const isLeaveDay  = leaveDays.has(dateStr);
+          const isWfhDay    = wfhDays.has(dateStr);
+          const halfDayHalf = halfDays.get(dateStr);
           const totalDayHrs = entries.reduce((s, e) => s + (e.hours || 0) + (e.blocked_hours || 0), 0);
 
           const daysLabels  = ["MON","TUE","WED","THU","FRI","SAT","SUN"];
@@ -729,6 +954,10 @@ export default function MyTimesheetPage() {
                   ? "ring-2 ring-dc-blue bg-blue-50/5 border-blue-200"
                   : isLeaveDay
                   ? "border-orange-200 bg-orange-50/20"
+                  : halfDayHalf
+                  ? "border-amber-200 bg-amber-50/15"
+                  : isWfhDay
+                  ? "border-blue-200 bg-blue-50/15"
                   : "border-slate-200"
               )}
             >
@@ -744,6 +973,18 @@ export default function MyTimesheetPage() {
                       Leave
                     </span>
                   )}
+                  {isWfhDay && (
+                    <span className="text-[9px] bg-blue-100 text-blue-600 font-black px-1.5 py-0.5 rounded border border-blue-200 uppercase tracking-wide flex items-center gap-0.5">
+                      <CalendarDays className="w-2.5 h-2.5" />
+                      WFH
+                    </span>
+                  )}
+                  {halfDayHalf && (
+                    <span className="text-[9px] bg-amber-100 text-amber-600 font-black px-1.5 py-0.5 rounded border border-amber-200 uppercase tracking-wide flex items-center gap-0.5">
+                      <BriefcaseMedical className="w-2.5 h-2.5" />
+                      {halfDayHalf === "first" ? "1st Half" : "2nd Half"}
+                    </span>
+                  )}
                 </div>
                 <div className="text-xs font-black text-navy mt-0.5">{dateFmt}</div>
                 <div className="text-xs text-slate-500 font-bold mt-1.5">{totalDayHrs.toFixed(1)} hr</div>
@@ -755,6 +996,28 @@ export default function MyTimesheetPage() {
                   <div className="text-[10px] font-black text-orange-600">Leave Day</div>
                   <div className="text-[9px] text-orange-400 font-semibold mt-0.5">
                     9 hr deducted from weekly target
+                  </div>
+                </div>
+              )}
+
+              {/* WFH day indicator */}
+              {isWfhDay && (
+                <div className="mb-3 bg-blue-50 border border-blue-200 rounded p-2.5 text-center">
+                  <div className="text-[10px] font-black text-blue-600">Working From Home</div>
+                  <div className="text-[9px] text-blue-400 font-semibold mt-0.5">
+                    Standard hours count towards target
+                  </div>
+                </div>
+              )}
+
+              {/* Half Day indicator */}
+              {halfDayHalf && (
+                <div className="mb-3 bg-amber-50 border border-amber-200 rounded p-2.5 text-center">
+                  <div className="text-[10px] font-black text-amber-600">
+                    Half Day ({halfDayHalf === "first" ? "1st Half" : "2nd Half"})
+                  </div>
+                  <div className="text-[9px] text-amber-400 font-semibold mt-0.5">
+                    4.5 hr deducted from weekly target
                   </div>
                 </div>
               )}

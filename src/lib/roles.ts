@@ -40,6 +40,7 @@ export const ROUTE_TO_TAB: Record<string, string> = {
   "/timesheet/team":         "timesheet",
   "/timesheet/approvals":    "approvals-ts",
   "/timesheet/resources":    "resource-utilization",
+  "/timesheet/analytics":    "hours-analytics",
 };
 
 // ─── Role → Allowed tabs ───────────────────────────────────────────────────

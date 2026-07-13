@@ -31,6 +31,8 @@ export default function TeamPage() {
   const [formResourceId, setFormResourceId] = useState("");
   const [formCapacity, setFormCapacity] = useState(100);
   const [formActive, setFormActive] = useState(1);
+  const [formDepartment, setFormDepartment] = useState("");
+  const [formSystemRole, setFormSystemRole] = useState("ENGINEER");
 
   // Filtered
   const filteredPeople = useMemo(() => {
@@ -58,6 +60,8 @@ export default function TeamPage() {
       setFormResourceId(person.resource_id || "");
       setFormCapacity(person.capacity_pct || 100);
       setFormActive(person.active ?? 1);
+      setFormDepartment(person.department || "");
+      setFormSystemRole(person.system_role || "ENGINEER");
     } else {
       setEditingPerson(null);
       setFormName("");
@@ -66,14 +70,15 @@ export default function TeamPage() {
       setFormResourceId("");
       setFormCapacity(100);
       setFormActive(1);
+      setFormDepartment("");
+      setFormSystemRole("ENGINEER");
     }
     setIsModalOpen(true);
   };
 
   const handleFormSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const colors = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899'];
-    const randomColor = colors[Math.floor(Math.random() * colors.length)];
+    const avatarColor = '#1E90E8';
 
     try {
       if (editingPerson) {
@@ -85,6 +90,9 @@ export default function TeamPage() {
           resource_id: formResourceId,
           capacity_pct: formCapacity,
           active: formActive,
+          department: formDepartment || undefined,
+          system_role: formSystemRole,
+          avatar_color: avatarColor,
         });
       } else {
         await createMutation.mutateAsync({
@@ -94,7 +102,9 @@ export default function TeamPage() {
           resource_id: formResourceId,
           capacity_pct: formCapacity,
           active: formActive,
-          avatar_color: randomColor,
+          avatar_color: avatarColor,
+          department: formDepartment || undefined,
+          system_role: formSystemRole,
         } as Omit<Person, "id">);
       }
       setIsModalOpen(false);
@@ -154,7 +164,7 @@ export default function TeamPage() {
       </div>
 
       {/* Filters and Search */}
-      <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200 mb-6 flex items-center justify-between">
+      <div className="clay-card p-4 mb-6 flex items-center justify-between">
         <div className="relative w-full max-w-md">
           <Search className="absolute left-3 top-2.5 w-4 h-4 text-slate-400" />
           <input 
@@ -172,7 +182,7 @@ export default function TeamPage() {
 
       {/* Team Grid */}
       {filteredPeople.length === 0 ? (
-        <div className="bg-white rounded-xl shadow-sm border border-slate-200 py-20 text-center">
+        <div className="clay-card py-20 text-center">
           <Users className="w-12 h-12 text-slate-300 mx-auto mb-3" />
           <p className="text-base font-medium text-slate-600">No team members found</p>
           <p className="text-sm text-slate-500 mt-1">Adjust your search or add a new person.</p>
@@ -180,7 +190,7 @@ export default function TeamPage() {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
           {filteredPeople.map((person) => (
-            <div key={person.id} className="bg-white rounded-xl shadow-sm border border-slate-200 p-5 flex flex-col hover:border-dc-blue/40 transition-colors group relative">
+            <div key={person.id} className="clay-card p-5 flex flex-col group relative">
               <ProtectedAction allowed={canManageTeam}>
                 <button 
                   onClick={() => handleOpenModal(person)}
@@ -194,7 +204,7 @@ export default function TeamPage() {
               <div className="flex items-start gap-3 mb-4">
                 <div 
                   className="w-12 h-12 rounded-full flex items-center justify-center text-white font-bold text-sm shadow-sm shrink-0"
-                  style={{ backgroundColor: person.avatar_color || '#94a3b8' }}
+                  style={{ backgroundColor: person.avatar_color || '#1E90E8' }}
                 >
                   {getInitials(person.name)}
                 </div>
@@ -202,6 +212,18 @@ export default function TeamPage() {
                   <h3 className="font-bold text-navy truncate" title={person.name}>{person.name}</h3>
                   <div className="text-xs font-medium text-slate-500 truncate" title={person.role || 'No Role'}>{person.role || 'No Role'}</div>
                   {person.email && <div className="text-xs text-dc-blue truncate mt-0.5" title={person.email}>{person.email}</div>}
+                  <div className="flex flex-wrap gap-1 mt-1.5">
+                    {person.department && (
+                      <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold bg-slate-100 text-slate-700 border border-slate-200">
+                        {person.department}
+                      </span>
+                    )}
+                    {person.system_role && (
+                      <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold bg-blue-50 text-dc-blue border border-blue-100">
+                        {person.system_role}
+                      </span>
+                    )}
+                  </div>
                 </div>
               </div>
               
@@ -302,6 +324,45 @@ export default function TeamPage() {
                   </div>
                 </div>
 
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-bold text-slate-600 uppercase tracking-wider">Department</label>
+                    <select
+                      value={formDepartment}
+                      onChange={(e) => setFormDepartment(e.target.value)}
+                      className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-dc-blue"
+                    >
+                      <option value="">None</option>
+                      <option value="Optics">Optics</option>
+                      <option value="Mechanical">Mechanical</option>
+                      <option value="Electronics">Electronics</option>
+                      <option value="Software">Software</option>
+                      <option value="Manufacturing">Manufacturing</option>
+                    </select>
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-bold text-slate-600 uppercase tracking-wider">System Role</label>
+                    <select
+                      value={formSystemRole}
+                      onChange={(e) => setFormSystemRole(e.target.value)}
+                      className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-dc-blue"
+                    >
+                      <option value="ENGINEER">ENGINEER</option>
+                      <option value="ADMIN">ADMIN</option>
+                      <option value="PMO">PMO</option>
+                      <option value="PROJECT_MANAGER">PROJECT_MANAGER</option>
+                      <option value="TEAM_LEAD">TEAM_LEAD</option>
+                      <option value="OPTICS_LEAD">OPTICS_LEAD</option>
+                      <option value="MECHANICAL_LEAD">MECHANICAL_LEAD</option>
+                      <option value="ELECTRONICS_LEAD">ELECTRONICS_LEAD</option>
+                      <option value="SOFTWARE_LEAD">SOFTWARE_LEAD</option>
+                      <option value="MANUFACTURING_LEAD">MANUFACTURING_LEAD</option>
+                      <option value="INTERN_SUPPORT_ENGINEER">INTERN_SUPPORT_ENGINEER</option>
+                      <option value="CUSTOMER">CUSTOMER</option>
+                    </select>
+                  </div>
+                </div>
+
                 <div className="space-y-1.5 pt-2">
                   <label className="flex items-center gap-2 cursor-pointer">
                     <input 
@@ -321,7 +382,7 @@ export default function TeamPage() {
               <button 
                 type="button"
                 onClick={() => setIsModalOpen(false)}
-                className="px-4 py-2 text-sm font-bold text-slate-600 hover:text-navy hover:bg-slate-200/50 rounded-lg transition-colors"
+                className="btn-secondary"
               >
                 Cancel
               </button>

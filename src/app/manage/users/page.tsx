@@ -2,9 +2,9 @@
 
 import React, { useState, useMemo } from "react";
 import { usePmoStore } from "@/store/use-pmo-store";
-import { useUsersQuery, useCreateUserMutation, useUpdateUserMutation } from "@/hooks/use-pmo-queries";
+import { useUsersQuery, useCreateUserMutation, useUpdateUserMutation, useDeleteUserMutation } from "@/hooks/use-pmo-queries";
 import { 
-  Users, Search, Plus, Edit3, X, Shield, Lock, Globe
+  Users, Search, Plus, Edit3, X, Shield, Lock, Globe, Trash2
 } from "lucide-react";
 import { User } from "@/types/pmo";
 import { cn } from "@/utils/cn";
@@ -12,6 +12,7 @@ import { cn } from "@/utils/cn";
 export default function UsersPage() {
   const createMutation = useCreateUserMutation();
   const updateMutation = useUpdateUserMutation();
+  const deleteMutation = useDeleteUserMutation();
   
   const { data: users = [], isLoading } = useUsersQuery();
 
@@ -86,8 +87,7 @@ export default function UsersPage() {
           customer_company: formCustomerCompany || undefined
         });
       } else {
-        const colors = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899'];
-        const randomColor = colors[Math.floor(Math.random() * colors.length)];
+        const avatarColor = '#1E90E8';
         
         await createMutation.mutateAsync({
           username: formUsername,
@@ -96,7 +96,7 @@ export default function UsersPage() {
           role: formRole,
           active: formActive,
           customer_company: formCustomerCompany || undefined,
-          avatar_color: randomColor
+          avatar_color: avatarColor
         } as Omit<User, "id">);
       }
       setIsModalOpen(false);
@@ -349,10 +349,30 @@ export default function UsersPage() {
             </div>
             
             <div className="px-6 py-4 border-t border-slate-100 flex items-center justify-end gap-3 bg-slate-50/50">
+              {editingUser && (
+                <button 
+                  type="button"
+                  onClick={async () => {
+                    if (confirm("Do you want to remove this user permanently?")) {
+                      try {
+                        await deleteMutation.mutateAsync(editingUser.id.toString());
+                        alert("✓ User deleted and cleaned up successfully.");
+                        setIsModalOpen(false);
+                      } catch (err) {
+                        alert("Failed to delete user.");
+                      }
+                    }
+                  }}
+                  className="mr-auto px-4 py-2 border border-rose-200 text-rose-600 hover:bg-rose-50 hover:text-rose-700 rounded-lg text-sm font-semibold flex items-center gap-1.5 transition-colors"
+                >
+                  <Trash2 className="w-4 h-4" />
+                  <span>Delete User</span>
+                </button>
+              )}
               <button 
                 type="button"
                 onClick={() => setIsModalOpen(false)}
-                className="px-4 py-2 text-sm font-bold text-slate-600 hover:text-navy hover:bg-slate-200/50 rounded-lg transition-colors"
+                className="btn-secondary"
               >
                 Cancel
               </button>

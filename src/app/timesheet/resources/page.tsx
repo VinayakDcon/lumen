@@ -30,7 +30,7 @@ export default function ResourceHoursPage() {
   const fetchData = async () => {
     try {
       setLoading(true);
-      const res = await fetch(`/api/resource-utilization?weeks=${weeksRange}`);
+      const res = await fetch(`/api-proxy/resource-utilization?weeks=${weeksRange}`);
       if (res.ok) {
         const data = await res.json();
         setApiData(data);

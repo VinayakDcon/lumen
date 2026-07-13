@@ -115,7 +115,176 @@ export default function DpdsGatesPage() {
   };
 
   const handleExportPack = (gateCode: string) => {
-    alert(`Generating review pack for ${gateCode}... (Ready to print)`);
+    const g = gatesData[gateCode];
+    if (!g) {
+      alert("No gate data found for " + gateCode);
+      return;
+    }
+    const dmaicByPhase = (g.dmaic || []).reduce((a: any, m: any) => { 
+      a[m.dmaic_phase] = m; 
+      return a; 
+    }, {});
+    
+    const win = window.open('', '_blank');
+    if (!win) {
+      alert("Popup blocker prevented opening the print window.");
+      return;
+    }
+
+    const delivRows = (g.deliverables || []).map(d => `
+      <tr>
+        <td style="text-align:center; font-size:14px">${d.completed === 1 ? '✅' : '⬜'}</td>
+        <td>${d.deliverable_name}${d.required === 1 ? ' <span style="color:#C62828">*</span>' : ''}</td>
+        <td><span class="badge">${d.kind}</span></td>
+        <td>${d.completed_by || '—'}</td>
+        <td>${d.completed_at ? d.completed_at.slice(0, 10) : '—'}</td>
+        <td>${d.carryover_from_programme_id ? '↪ ' + d.carryover_from_programme_id : ''}</td>
+      </tr>`).join('');
+
+    const dmaicRows = ['D', 'M', 'A', 'I', 'C'].map(ph => {
+      const m = dmaicByPhase[ph] || {};
+      return `<tr><td><b>${ph}</b></td><td>${m.status || 'NOT_STARTED'}</td><td>${m.notes || ''}</td><td>${m.evidence_link || ''}</td></tr>`;
+    }).join('');
+
+    win.document.write(`
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>Gate Review Pack · ${activeProgramme.name} · ${gateCode}</title>
+          <style>
+            @page { size: A4; margin: 12mm; }
+            body { font-family: 'Inter', system-ui, sans-serif; padding: 0; color: #0D1B2E; }
+            h1 { font-size: 18px; margin: 0 0 4px; }
+            h2 { font-size: 14px; margin: 14px 0 6px; color: #0b1e36; }
+            .intent-box { background: #FFFBF0; border-left: 4px solid #C9A95A; padding: 10px 12px; margin: 10px 0; font-size: 12px; }
+            .meta { font-size: 11px; color: #6B7280; }
+            .head-strip { background: ${g.colour || '#1E90E8'}; color: white; padding: 12px 14px; border-radius: 6px; margin-bottom: 14px; }
+            .head-strip h1 { color: white; margin: 0 0 4px; font-size: 18px; }
+            .head-strip .ready-bar { width: 100%; height: 8px; background: rgba(255,255,255,0.25); border-radius: 4px; margin-top: 8px; }
+            .head-strip .ready-fill { height: 100%; background: white; border-radius: 4px; width: ${g.readiness_pct}%; }
+            table { width: 100%; border-collapse: collapse; font-size: 11px; }
+            th, td { border: 1px solid #E5E7EB; padding: 6px 8px; text-align: left; vertical-align: top; }
+            th { background: #0D1B2E; color: white; font-weight: 700; }
+            .badge { font-size: 9px; padding: 1px 5px; background: #E8F2FC; color: #0B5BAF; border-radius: 3px; font-weight: 600; }
+            .sig { margin-top: 24px; display: flex; gap: 40px; font-size: 11px; }
+            .sig-line { flex: 1; border-top: 1px solid #999; padding-top: 4px; }
+          </style>
+        </head>
+        <body>
+          <h1>${activeProgramme.name}</h1>
+          <div class="meta">${activeProgramme.id} · Generated ${new Date().toLocaleString()} · ${user?.name || 'system'}</div>
+          <div class="intent-box"><b>Strategic intent:</b> ${activeProgramme.notes || '—'}</div>
+
+          <div class="head-strip">
+            <h1>${gateCode} · ${g.name || ''}</h1>
+            <div class="meta" style="color:rgba(255,255,255,0.85)">
+              Wk ${g.start_wk}–${g.end_wk} · Status: <b>${g.status}</b> · ${g.completed_count}/${g.total_count} deliverables · ${g.required_completed}/${g.required_count} mandatory complete
+            </div>
+            <div class="ready-bar"><div class="ready-fill"></div></div>
+          </div>
+
+          <h2>Deliverables (* = mandatory)</h2>
+          <table>
+            <thead>
+              <tr>
+                <th style="width:30px">✓</th>
+                <th>Deliverable</th>
+                <th>Kind</th>
+                <th>By</th>
+                <th>When</th>
+                <th>Notes</th>
+              </tr>
+            </thead>
+            <tbody>${delivRows}</tbody>
+          </table>
+
+          <h2>Six Sigma DMAIC</h2>
+          <table>
+            <thead>
+              <tr>
+                <th style="width:40px">Phase</th>
+                <th style="width:120px">Status</th>
+                <th>Notes</th>
+                <th>Evidence</th>
+              </tr>
+            </thead>
+            <tbody>${dmaicRows}</tbody>
+          </table>
+
+          <div class="sig">
+            <div class="sig-line">Programme Manager</div>
+            <div class="sig-line">Lead Engineer</div>
+            <div class="sig-line">Quality / Customer</div>
+          </div>
+          <script>window.onload = () => setTimeout(() => window.print(), 300);</script>
+        </body>
+      </html>
+    `);
+    win.document.close();
+  };
+
+  const handleExportFullPack = () => {
+    if (!gatesData) return;
+    const win = window.open('', '_blank');
+    if (!win) {
+      alert("Popup blocker prevented opening the print window.");
+      return;
+    }
+    const sections = Object.values(gatesData).map((g: DpdsGateInfo) => {
+      const delivRows = (g.deliverables || []).map(d => `
+        <tr>
+          <td style="text-align:center">${d.completed === 1 ? '✅' : '⬜'}</td>
+          <td>${d.deliverable_name}${d.required === 1 ? ' *' : ''}</td>
+          <td>${d.kind}</td>
+          <td>${d.completed_by || '—'}</td>
+          <td>${d.completed_at ? d.completed_at.slice(0, 10) : '—'}</td>
+        </tr>`).join('');
+      return `
+        <div class="gate-section">
+          <div class="gate-head" style="background:${g.colour || '#1E90E8'}">${g.code} · ${g.name || ''} — ${g.status} (${g.readiness_pct}%)</div>
+          <table>
+            <thead>
+              <tr>
+                <th style="width:30px">✓</th>
+                <th>Deliverable</th>
+                <th>Kind</th>
+                <th>By</th>
+                <th>When</th>
+              </tr>
+            </thead>
+            <tbody>${delivRows}</tbody>
+          </table>
+        </div>`;
+    }).join('');
+
+    win.document.write(`
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>DPDS Programme Pack · ${activeProgramme.name}</title>
+          <style>
+            @page { size: A4; margin: 12mm; }
+            body { font-family: 'Inter', system-ui, sans-serif; color: #0D1B2E; }
+            h1 { margin: 0 0 4px; font-size: 18px; }
+            .meta { font-size: 11px; color: #6B7280; margin-bottom: 14px; }
+            .intent-box { background: #FFFBF0; border-left: 4px solid #C9A95A; padding: 10px 12px; margin: 10px 0; font-size: 12px; }
+            .gate-section { margin: 18px 0; page-break-inside: avoid; }
+            .gate-head { color: white; padding: 8px 12px; font-weight: 700; border-radius: 4px; font-size: 12px; }
+            table { width: 100%; border-collapse: collapse; font-size: 10px; margin-top: 6px; }
+            th, td { border: 1px solid #E5E7EB; padding: 6px 8px; text-align: left; }
+            th { background: #0D1B2E; color: white; }
+          </style>
+        </head>
+        <body>
+          <h1>${activeProgramme.name} · DPDS Programme Pack</h1>
+          <div class="meta">${activeProgramme.id} · Generated ${new Date().toLocaleString()}</div>
+          <div class="intent-box"><b>Strategic intent:</b> ${activeProgramme.notes || '—'}</div>
+          ${sections}
+          <script>window.onload = () => setTimeout(() => window.print(), 300);</script>
+        </body>
+      </html>
+    `);
+    win.document.close();
   };
 
   const getDmaicPillClass = (status: string) => {
@@ -178,7 +347,7 @@ export default function DpdsGatesPage() {
             </button>
           )}
           <button 
-            onClick={() => handleExportPack("G0")}
+            onClick={handleExportFullPack}
             className="flex items-center justify-center gap-1.5 px-3.5 py-2 bg-dc-blue hover:bg-blue-700 text-white text-xs font-bold rounded shadow-sm transition-colors"
           >
             <FileSpreadsheet className="w-3.5 h-3.5" />

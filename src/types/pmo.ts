@@ -37,6 +37,11 @@ export interface Person {
   resource_id?: string;
   capacity_pct?: number;
   allocated_hr?: number;
+  department?: string;
+  system_role?: string;
+  weekly_target_hr?: number;
+  billable_target_hr?: number;
+  bau_target_hr?: number;
 }
 
 export interface Skill {

@@ -398,7 +398,7 @@ export default function VendorsPage() {
               <button 
                 type="button"
                 onClick={() => setIsModalOpen(false)}
-                className="px-4 py-2 text-sm font-bold text-slate-600 hover:text-navy hover:bg-slate-200/50 rounded-lg transition-colors"
+                className="btn-secondary"
               >
                 Cancel
               </button>

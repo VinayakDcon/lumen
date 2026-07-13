@@ -6,12 +6,14 @@ import { Programme, DashboardMetrics, Archetype, ScurvePoint, FollowUpTask, Char
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
 export function useProgrammesQuery() {
+  const email = usePmoStore((state) => state.user?.email);
   return useQuery<Programme[]>({
-    queryKey: ["programmes"],
+    queryKey: ["programmes", email],
     queryFn: async () => {
-      const res = await fetch("/api-proxy/programmes");
-      if (!res.ok) throw new Error("Failed to fetch");
-      return res.json();
+      const res = await fetch(`/api-proxy/programmes?email=${encodeURIComponent(email || '')}`);
+      if (!res.ok) throw new Error("Failed to fetch programmes");
+      const list: Programme[] = await res.json();
+      return list;
     },
   });
 }
@@ -52,26 +54,25 @@ export function useTemplatesQuery() {
 }
 
 export function useScurveQuery(id: string) {
-  const getScurveData = usePmoStore((state) => state.getScurveData);
-  
   return useQuery<ScurvePoint[]>({
     queryKey: ["scurve", id],
     queryFn: async () => {
-      await delay(200);
-      return getScurveData(id);
+      const res = await fetch(`/api-proxy/tasks/scurve?programme_id=${id}`);
+      if (!res.ok) throw new Error("Failed to fetch scurve");
+      return res.json();
     },
     enabled: !!id,
   });
 }
 
 export function useFollowUpQuery(id: string) {
-  const getFollowUpTasks = usePmoStore((state) => state.getFollowUpTasks);
-  
+  const email = usePmoStore((state) => state.user?.email);
   return useQuery<FollowUpTask[]>({
-    queryKey: ["followup", id],
+    queryKey: ["followup", id, email],
     queryFn: async () => {
-      await delay(200);
-      return getFollowUpTasks(id);
+      const res = await fetch(`/api-proxy/tasks/follow-up?programme_id=${id}&email=${encodeURIComponent(email || '')}`);
+      if (!res.ok) throw new Error("Failed to fetch follow-ups");
+      return res.json();
     },
     enabled: !!id,
   });
@@ -165,13 +166,12 @@ export function useHeatmapReportQuery(id: string) {
 }
 
 export function useAuditLogsQuery() {
-  const auditLogs = usePmoStore((state) => state.auditLogs);
-  
   return useQuery<any[]>({
     queryKey: ["auditLogs"],
     queryFn: async () => {
-      await delay(150);
-      return auditLogs || [];
+      const res = await fetch("/api-proxy/manage/audit-logs");
+      if (!res.ok) throw new Error("Failed to fetch audit logs");
+      return res.json();
     }
   });
 }
@@ -189,13 +189,12 @@ export function useMilestonesQuery(pid: string) {
 }
 
 export function useConsignmentsQuery(pid: string) {
-  const consignments = usePmoStore((state) => state.consignments);
-  
   return useQuery<ConsignmentKit[]>({
     queryKey: ["consignments", pid],
     queryFn: async () => {
-      await delay(200);
-      return consignments.filter(c => c.programme_id === pid);
+      const res = await fetch(`/api-proxy/deliver/consignments?programme_id=${pid}`);
+      if (!res.ok) throw new Error("Failed to fetch consignments");
+      return res.json();
     },
     enabled: !!pid,
   });
@@ -205,8 +204,8 @@ export function useRisksQuery(pid: string) {
   return useQuery<Risk[]>({
     queryKey: ["risks", pid],
     queryFn: async () => {
-      const res = await fetch(`/api-proxy/risks?programme_id=${pid}`);
-      if (!res.ok) throw new Error("Failed to fetch");
+      const res = await fetch(`/api-proxy/deliver/risks?programme_id=${pid}`);
+      if (!res.ok) throw new Error("Failed to fetch risks");
       return res.json();
     },
     enabled: !!pid,
@@ -214,218 +213,200 @@ export function useRisksQuery(pid: string) {
 }
 
 export function useDfmeaQuery(pid: string) {
-  const dfmeaItems = usePmoStore((state) => state.dfmeaItems);
-  
   return useQuery<{ items: DfmeaItem[]; stats: any }>({
     queryKey: ["dfmea", pid],
     queryFn: async () => {
-      await delay(200);
-      const items = dfmeaItems.filter(i => i.programme_id === pid);
-      const total = items.length;
-      const highRpn = items.filter(i => (i.severity * i.occurrence * i.detection) >= 100).length;
-      const open = items.filter(i => i.action_status !== 'CLOSED').length;
-      return {
-        items,
-        stats: { total, high_rpn: highRpn, open }
-      };
+      const res = await fetch(`/api-proxy/deliver/dfmea?programme_id=${pid}`);
+      if (!res.ok) throw new Error("Failed to fetch DFMEA");
+      return res.json();
     },
     enabled: !!pid,
   });
 }
 
 export function useChangeRequestsQuery(pid: string) {
-  const changeRequests = usePmoStore((state) => state.changeRequests);
-  
   return useQuery<ChangeRequest[]>({
     queryKey: ["changeRequests", pid],
     queryFn: async () => {
-      await delay(200);
-      return changeRequests.filter(cr => cr.programme_id === pid);
+      const res = await fetch(`/api-proxy/deliver/change-requests?programme_id=${pid}`);
+      if (!res.ok) throw new Error("Failed to fetch change requests");
+      return res.json();
     },
     enabled: !!pid,
   });
 }
 
 export function useCustomerCommsQuery(pid: string) {
-  const customerComms = usePmoStore((state) => state.customerComms);
-  
   return useQuery<CustomerComm[]>({
     queryKey: ["customerComms", pid],
     queryFn: async () => {
-      await delay(200);
-      return customerComms.filter(cc => cc.programme_id === pid);
+      const res = await fetch(`/api-proxy/deliver/customer-comms?programme_id=${pid}`);
+      if (!res.ok) throw new Error("Failed to fetch customer comms");
+      return res.json();
     },
     enabled: !!pid,
   });
 }
 
 export function useDecisionsQuery(pid: string) {
-  const decisions = usePmoStore((state) => state.decisions);
-  
   return useQuery<Decision[]>({
     queryKey: ["decisions", pid],
     queryFn: async () => {
-      await delay(200);
-      return decisions.filter(d => d.programme_id === pid);
+      const res = await fetch(`/api-proxy/records/decisions?programme_id=${pid}`);
+      if (!res.ok) throw new Error("Failed to fetch decisions");
+      return res.json();
     },
     enabled: !!pid,
   });
 }
 
 export function useMeetingsQuery(pid: string) {
-  const meetings = usePmoStore((state) => state.meetings);
-  
   return useQuery<Meeting[]>({
     queryKey: ["meetings", pid],
     queryFn: async () => {
-      await delay(200);
-      return meetings.filter(m => m.programme_id === pid);
+      const res = await fetch(`/api-proxy/records/meetings?programme_id=${pid}`);
+      if (!res.ok) throw new Error("Failed to fetch meetings");
+      return res.json();
     },
     enabled: !!pid,
   });
 }
 
 export function useEmailsQuery() {
-  const emails = usePmoStore((state) => state.emails);
-  
   return useQuery<EmailQueueItem[]>({
     queryKey: ["emails"],
     queryFn: async () => {
-      await delay(200);
-      return emails;
+      const res = await fetch("/api-proxy/records/emails");
+      if (!res.ok) throw new Error("Failed to fetch emails");
+      return res.json();
     }
   });
 }
 
 export function useVendorsQuery() {
-  const vendors = usePmoStore((state) => state.vendors);
-  
   return useQuery<Vendor[]>({
     queryKey: ["vendors"],
     queryFn: async () => {
-      await delay(200);
-      return vendors;
+      const res = await fetch("/api-proxy/finance/vendors");
+      if (!res.ok) throw new Error("Failed to fetch vendors");
+      return res.json();
     }
   });
 }
 
 export function useQuotesQuery(pid: string) {
-  const quotes = usePmoStore((state) => state.quotes);
-  
   return useQuery<Quote[]>({
     queryKey: ["quotes", pid],
     queryFn: async () => {
-      await delay(200);
-      return quotes.filter(q => q.programme_id === pid);
+      const res = await fetch(`/api-proxy/finance/quotes?programme_id=${pid}`);
+      if (!res.ok) throw new Error("Failed to fetch quotes");
+      return res.json();
     },
     enabled: !!pid,
   });
 }
 
 export function usePurchaseOrdersQuery(pid: string) {
-  const purchaseOrders = usePmoStore((state) => state.purchaseOrders);
-  
   return useQuery<PurchaseOrder[]>({
     queryKey: ["purchaseOrders", pid],
     queryFn: async () => {
-      await delay(200);
-      return purchaseOrders.filter(po => po.programme_id === pid);
+      const res = await fetch(`/api-proxy/finance/purchase-orders?programme_id=${pid}`);
+      if (!res.ok) throw new Error("Failed to fetch purchase orders");
+      return res.json();
     },
     enabled: !!pid,
   });
 }
 
 export function useInvoicesQuery(pid: string) {
-  const invoices = usePmoStore((state) => state.invoices);
-  
   return useQuery<Invoice[]>({
     queryKey: ["invoices", pid],
     queryFn: async () => {
-      await delay(200);
-      return invoices.filter(inv => inv.programme_id === pid);
+      const res = await fetch(`/api-proxy/finance/invoices?programme_id=${pid}`);
+      if (!res.ok) throw new Error("Failed to fetch invoices");
+      return res.json();
     },
     enabled: !!pid,
   });
 }
 
 export function usePaymentsQuery(pid: string) {
-  const payments = usePmoStore((state) => state.payments);
-  
   return useQuery<Payment[]>({
     queryKey: ["payments", pid],
     queryFn: async () => {
-      await delay(200);
-      return payments.filter(p => p.programme_id === pid);
+      const res = await fetch(`/api-proxy/finance/payments?programme_id=${pid}`);
+      if (!res.ok) throw new Error("Failed to fetch payments");
+      return res.json();
     },
     enabled: !!pid,
   });
 }
 
 export function useBudgetQuery(pid: string) {
-  const budgetLines = usePmoStore((state) => state.budgetLines);
   return useQuery<BudgetLine[]>({
     queryKey: ["budget", pid],
     queryFn: async () => {
-      await delay(200);
-      return budgetLines.filter(b => b.programme_id === pid);
+      const res = await fetch(`/api-proxy/finance/budget-lines?programme_id=${pid}`);
+      if (!res.ok) throw new Error("Failed to fetch budget");
+      return res.json();
     },
     enabled: !!pid,
   });
 }
 
 export function useDocumentsQuery(pid: string) {
-  const documents = usePmoStore((state) => state.documents);
   return useQuery<ProjectDocument[]>({
     queryKey: ["documents", pid],
     queryFn: async () => {
-      await delay(200);
-      return documents.filter(d => d.programme_id === pid);
+      const res = await fetch(`/api-proxy/library/documents?programme_id=${pid}`);
+      if (!res.ok) throw new Error("Failed to fetch documents");
+      return res.json();
     },
     enabled: !!pid,
   });
 }
 
 export function useStandardsQuery() {
-  const standards = usePmoStore((state) => state.standards);
   return useQuery<Standard[]>({
     queryKey: ["standards"],
     queryFn: async () => {
-      await delay(200);
-      return standards;
+      const res = await fetch("/api-proxy/library/standards");
+      if (!res.ok) throw new Error("Failed to fetch standards");
+      return res.json();
     }
   });
 }
 
 export function useToolingQuery(pid: string) {
-  const tooling = usePmoStore((state) => state.tooling);
   return useQuery<ToolingPart[]>({
     queryKey: ["tooling", pid],
     queryFn: async () => {
-      await delay(200);
-      return tooling.filter(t => t.programme_id === pid);
+      const res = await fetch(`/api-proxy/library/tools?programme_id=${pid}`);
+      if (!res.ok) throw new Error("Failed to fetch tooling");
+      return res.json();
     },
     enabled: !!pid,
   });
 }
 
 export function useLabEquipmentQuery() {
-  const labEquipment = usePmoStore((state) => state.labEquipment);
   return useQuery<LabEquipment[]>({
     queryKey: ["labEquipment"],
     queryFn: async () => {
-      await delay(200);
-      return labEquipment;
+      const res = await fetch("/api-proxy/library/equipment");
+      if (!res.ok) throw new Error("Failed to fetch lab equipment");
+      return res.json();
     }
   });
 }
 
 export function useLabBookingsQuery(pid: string) {
-  const labBookings = usePmoStore((state) => state.labBookings);
   return useQuery<LabBooking[]>({
     queryKey: ["labBookings", pid],
     queryFn: async () => {
-      await delay(200);
-      return labBookings.filter(b => b.programme_id === pid);
+      const res = await fetch(`/api-proxy/library/equipment-bookings?programme_id=${pid}`);
+      if (!res.ok) throw new Error("Failed to fetch lab bookings");
+      return res.json();
     },
     enabled: !!pid,
   });
@@ -525,35 +506,52 @@ export function useUpdateUserMutation() {
   });
 }
 
+export function useDeleteUserMutation() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const res = await fetch(`/api-proxy/manage/users/${id}`, {
+        method: "DELETE",
+      });
+      if (!res.ok) throw new Error("Failed to delete user");
+      return res.json();
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["users"] });
+      qc.invalidateQueries({ queryKey: ["people"] });
+    },
+  });
+}
+
 export function useSkillsQuery() {
-  const skills = usePmoStore((state) => state.skills);
   return useQuery<Skill[]>({
     queryKey: ["skills"],
     queryFn: async () => {
-      await delay(200);
-      return skills;
+      const res = await fetch("/api-proxy/manage/skills");
+      if (!res.ok) throw new Error("Failed to fetch skills");
+      return res.json();
     }
   });
 }
 
 export function usePersonSkillsQuery() {
-  const personSkills = usePmoStore((state) => state.personSkills);
   return useQuery<PersonSkill[]>({
     queryKey: ["personSkills"],
     queryFn: async () => {
-      await delay(200);
-      return personSkills;
+      const res = await fetch("/api-proxy/manage/person-skills");
+      if (!res.ok) throw new Error("Failed to fetch person skills");
+      return res.json();
     }
   });
 }
 
 export function useProgrammeResourcesQuery(pid: string) {
-  const resources = usePmoStore((state) => state.programmeResources);
   return useQuery<ProgrammeResource[]>({
     queryKey: ["programmeResources", pid],
     queryFn: async () => {
-      await delay(200);
-      return resources.filter(r => r.programme_id === pid);
+      const res = await fetch(`/api-proxy/manage/programme-resources?programme_id=${pid}`);
+      if (!res.ok) throw new Error("Failed to fetch programme resources");
+      return res.json();
     },
     enabled: !!pid,
   });
@@ -583,6 +581,21 @@ export function useTimesheetReportQuery(weeks: number, pid?: string) {
       }
       const res = await fetch(url);
       if (!res.ok) throw new Error("Failed to fetch timesheet report");
+      return res.json();
+    }
+  });
+}
+
+export function useHoursAnalyticsQuery(week?: string) {
+  return useQuery<any>({
+    queryKey: ["hoursAnalytics", week],
+    queryFn: async () => {
+      let url = "/api-proxy/reports/hours-analytics";
+      if (week) {
+        url += `?week=${encodeURIComponent(week)}`;
+      }
+      const res = await fetch(url);
+      if (!res.ok) throw new Error("Failed to fetch hours analytics report");
       return res.json();
     }
   });

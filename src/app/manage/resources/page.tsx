@@ -42,7 +42,7 @@ export default function ResourcesPage() {
         ...res,
         personName: person?.name || "Unknown",
         personEmail: person?.email || "",
-        avatar_color: person?.avatar_color || "#94a3b8",
+        avatar_color: person?.avatar_color || "#1E90E8",
         resourceId: person?.resource_id || "—"
       };
     });
@@ -382,7 +382,7 @@ export default function ResourcesPage() {
               <button 
                 type="button"
                 onClick={() => setIsModalOpen(false)}
-                className="px-4 py-2 text-sm font-bold text-slate-600 hover:text-navy hover:bg-slate-200/50 rounded-lg transition-colors"
+                className="btn-secondary"
               >
                 Cancel
               </button>

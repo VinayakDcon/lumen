@@ -435,26 +435,101 @@ export default function WbsPage() {
     setIsModalOpen(true);
   };
 
-  // Excel Export mock
+  // WBS Import states
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
+  const [importStep, setImportStep] = useState(1);
+  const [importFile, setImportFile] = useState<File | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
+  const [importPreview, setImportPreview] = useState<any>(null);
+  const [replaceDuplicates, setReplaceDuplicates] = useState(true);
+  const [importMode, setImportMode] = useState<"update" | "replace">("update");
+
+  // Excel Export Handler (real .xlsx)
   const handleExportExcel = () => {
-    const header = "WBS,Task,Phase,Part,Discipline,StartWk,FinishWk,PlanHr,ActualHr,BlockedHr,Owner,Status,Completion\n";
-    const rows = rawTasks.map(t => {
-      const rolled = rollupTaskInfo(t);
-      return `"${t.wbs}","${t.name}","${t.phase}","${t.part}","${t.discipline}",${t.start_wk},${t.finish_wk},${rolled.plan_hr},${rolled.actual_hr},${rolled.blocked_hr},"${rolled.resources}","${rolled.status}",${rolled.percent}`;
-    }).join("\n");
-    
-    const blob = new Blob([header + rows], { type: "text/csv" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `${activeProgrammeId}_WBS.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
+    if (!activeProgrammeId) {
+      alert("Please select an active programme first.");
+      return;
+    }
+    window.open(`/api-proxy/excel/export?programme_id=${activeProgrammeId}`, '_blank');
   };
 
-  // Excel Import mock
+  // Excel Import Trigger
   const handleImportWbs = () => {
-    alert("Excel WBS Import dialog initialized. Select your standardized PMO spreadsheet to update timeline hierarchies.");
+    setImportStep(1);
+    setImportFile(null);
+    setImportPreview(null);
+    setIsImportModalOpen(true);
+  };
+
+  // Step 1: File Upload -> Preview API Call
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      const file = e.target.files[0];
+      setImportFile(file);
+      setIsUploading(true);
+
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("programme_id", activeProgrammeId);
+
+      try {
+        const res = await fetch("/api-proxy/tasks/import-wbs/preview", {
+          method: "POST",
+          body: formData,
+        });
+
+        if (!res.ok) {
+          const err = await res.json();
+          throw new Error(err.error || "Preview failed");
+        }
+
+        const data = await res.json();
+        setImportPreview(data);
+        setImportStep(2);
+      } catch (err: any) {
+        console.error(err);
+        alert(err.message || "Failed to parse import file. Check header fields.");
+      } finally {
+        setIsUploading(false);
+      }
+    }
+  };
+
+  // Step 2: Confirm -> Commit API Call
+  const handleConfirmImport = async () => {
+    if (!importPreview) return;
+
+    if (importMode === "replace") {
+      const ok = confirm(
+        "⚠️ REPLACE ENTIRE WBS\n\nThis will DELETE ALL existing WBS records for this programme and replace them with the imported data.\n\nThis action cannot be undone. Continue?"
+      );
+      if (!ok) return;
+    }
+
+    try {
+      const res = await fetch("/api-proxy/tasks/import-wbs/confirm", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          preview_id: importPreview.preview_id,
+          programme_id: activeProgrammeId,
+          replace_duplicates: replaceDuplicates,
+          import_mode: importMode,
+        }),
+      });
+
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || "Confirmation failed");
+      }
+
+      const data = await res.json();
+      setImportPreview(data);
+      setImportStep(3);
+    } catch (err: any) {
+      console.error(err);
+      alert(err.message || "WBS confirmation failed.");
+    }
   };
 
   // Badge rendering styles
@@ -505,47 +580,47 @@ export default function WbsPage() {
     let docBubbleClass = "";
 
     if ((t.level || 3) === 1) {
-      rowBgClass = "bg-navy text-gold font-bold border-b border-slate-800/60";
-      nameIndentClass = "pl-2 font-bold text-gold";
-      wbsTextClass = "text-gold font-bold";
-      discTextClass = "text-gold-light/90 font-bold";
+      rowBgClass = "bg-[#0D1B2E] dark:bg-[#1F2937] text-[#C9A95A] dark:text-[#C9A95A] font-bold border-b border-slate-800/60 dark:border-slate-800/60";
+      nameIndentClass = "pl-2 font-bold text-[#C9A95A]";
+      wbsTextClass = "text-[#C9A95A] font-bold";
+      discTextClass = "text-slate-200 dark:text-slate-300 font-bold";
       weeksTextClass = "text-white font-mono";
-      planHrTextClass = "text-gold font-bold font-mono";
+      planHrTextClass = "text-[#C9A95A] font-bold font-mono";
       actualHrTextClass = "text-white font-bold font-mono";
       blockedHrTextClass = "text-red-400 font-bold font-mono";
-      resourceTextClass = "text-gold-light/90 font-semibold";
+      resourceTextClass = "text-slate-200 dark:text-slate-350 font-semibold";
       reviewerTextClass = "text-white/80";
-      uploadBtnClass = "bg-white/10 hover:bg-white/20 text-gold border border-gold/40 hover:border-gold";
-      docLinkClass = "text-gold-light hover:underline hover:text-white font-semibold";
-      docBubbleClass = "bg-white/10 border border-white/20 text-gold-light";
+      uploadBtnClass = "bg-white/10 hover:bg-white/20 text-[#C9A95A] border border-[#C9A95A]/40 hover:border-[#C9A95A]";
+      docLinkClass = "text-white hover:underline font-semibold";
+      docBubbleClass = "bg-white/10 border border-white/20 text-[#C9A95A]";
     } else if ((t.level || 3) === 2) {
-      rowBgClass = "bg-dc-soft text-navy font-bold border-b border-slate-200";
-      nameIndentClass = "pl-6 font-bold text-navy";
-      wbsTextClass = "text-navy font-bold";
-      discTextClass = "text-navy/80 font-bold";
-      weeksTextClass = "text-navy font-mono";
-      planHrTextClass = "text-navy font-bold font-mono";
-      actualHrTextClass = "text-navy font-bold font-mono";
-      blockedHrTextClass = "text-red-600 font-bold font-mono";
-      resourceTextClass = "text-slate-800 font-semibold";
-      reviewerTextClass = "text-navy/70";
-      uploadBtnClass = "bg-navy/10 hover:bg-navy/20 text-navy border border-navy/30 hover:border-navy/50";
-      docLinkClass = "text-navy hover:underline hover:text-dc-deep font-semibold";
-      docBubbleClass = "bg-navy/5 border border-navy/10 text-navy";
+      rowBgClass = "bg-[#E8F2FC] dark:bg-[#0F172A] text-[#0D1B2E] dark:text-slate-200 font-bold border-b border-slate-200 dark:border-slate-800";
+      nameIndentClass = "pl-6 font-bold text-[#0D1B2E] dark:text-slate-200";
+      wbsTextClass = "text-[#0D1B2E] dark:text-slate-200 font-bold";
+      discTextClass = "text-[#0D1B2E]/80 dark:text-slate-300/80 font-bold";
+      weeksTextClass = "text-[#0D1B2E] dark:text-slate-300 font-mono";
+      planHrTextClass = "text-[#0D1B2E] dark:text-[#C9A95A] font-bold font-mono";
+      actualHrTextClass = "text-[#0D1B2E] dark:text-slate-300 font-bold font-mono";
+      blockedHrTextClass = "text-red-600 dark:text-red-400 font-bold font-mono";
+      resourceTextClass = "text-slate-800 dark:text-slate-300 font-semibold";
+      reviewerTextClass = "text-[#0D1B2E]/70 dark:text-slate-400/70";
+      uploadBtnClass = "bg-[#0D1B2E]/10 hover:bg-[#0D1B2E]/20 text-[#0D1B2E] dark:text-slate-200 border border-[#0D1B2E]/30 dark:border-slate-700/50";
+      docLinkClass = "text-[#0D1B2E] dark:text-dc-blue hover:underline font-semibold";
+      docBubbleClass = "bg-[#0D1B2E]/5 dark:bg-slate-800 border border-[#0D1B2E]/10 dark:border-slate-700 text-[#0D1B2E] dark:text-slate-300";
     } else {
-      rowBgClass = "bg-white text-slate-600 hover:bg-slate-50/50";
-      nameIndentClass = "pl-10 text-slate-500 font-medium";
-      wbsTextClass = "text-slate-400 font-mono";
-      discTextClass = "text-slate-500 font-bold";
-      weeksTextClass = "text-slate-600 font-mono";
-      planHrTextClass = "text-slate-700 font-semibold font-mono";
-      actualHrTextClass = "text-slate-700 font-semibold font-mono";
-      blockedHrTextClass = "text-red-600 font-bold font-mono";
-      resourceTextClass = "text-slate-600 font-medium";
-      reviewerTextClass = "text-slate-500";
-      uploadBtnClass = "bg-slate-50 hover:bg-slate-100 border border-slate-200 hover:border-slate-300 text-slate-700";
+      rowBgClass = "bg-white dark:bg-[#111827] text-slate-650 dark:text-slate-300 hover:bg-slate-50/50 dark:hover:bg-slate-800/50";
+      nameIndentClass = "pl-10 text-slate-500 dark:text-slate-450 font-medium";
+      wbsTextClass = "text-slate-400 dark:text-slate-500 font-mono";
+      discTextClass = "text-slate-500 dark:text-slate-450 font-bold";
+      weeksTextClass = "text-slate-600 dark:text-slate-400 font-mono";
+      planHrTextClass = "text-slate-700 dark:text-slate-300 font-semibold font-mono";
+      actualHrTextClass = "text-slate-700 dark:text-slate-300 font-semibold font-mono";
+      blockedHrTextClass = "text-red-600 dark:text-red-400 font-bold font-mono";
+      resourceTextClass = "text-slate-600 dark:text-slate-400 font-medium";
+      reviewerTextClass = "text-slate-500 dark:text-slate-400";
+      uploadBtnClass = "bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300";
       docLinkClass = "text-dc-blue hover:underline hover:text-dc-deep font-semibold";
-      docBubbleClass = "bg-slate-50 border border-slate-200/80 text-slate-700";
+      docBubbleClass = "bg-slate-50 dark:bg-slate-800 border border-slate-200/80 dark:border-slate-700 text-slate-700 dark:text-slate-300";
     }
 
     return (
@@ -699,27 +774,52 @@ export default function WbsPage() {
               </div>
             )}
             
-            {/* Upload Button */}
+            {/* Attach File Button */}
             <label className={cn("flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold transition-all cursor-pointer w-fit", uploadBtnClass)}>
               <UploadCloud className="w-2.5 h-2.5 text-current" />
-              <span>Upload</span>
+              <span>Add File</span>
               <input 
                 type="file" 
                 className="hidden" 
-                onChange={(e) => {
+                onChange={async (e) => {
                   const file = e.target.files?.[0];
                   if (file) {
-                    const docUrl = URL.createObjectURL(file);
-                    const formattedSize = file.size > 1024 * 1024 
-                      ? `${(file.size / (1024 * 1024)).toFixed(1)} MB`
-                      : `${(file.size / 1024).toFixed(0)} KB`;
-                    const newDoc = {
-                      name: file.name,
-                      url: docUrl,
-                      size: formattedSize
-                    };
-                    const updatedDocs = [...(t.docs || []), newDoc];
-                    updateTask(t.wbs, { docs: updatedDocs });
+                    const formData = new FormData();
+                    formData.append("file", file);
+                    formData.append("wbs", t.wbs);
+                    formData.append("uploaded_by", user?.name || "User");
+
+                    try {
+                      const uploadRes = await fetch("/api-proxy/attachments/upload", {
+                        method: "POST",
+                        body: formData
+                      });
+                      
+                      if (!uploadRes.ok) {
+                        const errData = await uploadRes.json();
+                        alert(errData.error || "File upload rejected by security scan.");
+                        return;
+                      }
+
+                      const uploadedFile = await uploadRes.json();
+                      const formattedSize = file.size > 1024 * 1024 
+                        ? `${(file.size / (1024 * 1024)).toFixed(1)} MB`
+                        : `${(file.size / 1024).toFixed(0)} KB`;
+                      
+                      const newDoc = {
+                        name: file.name,
+                        url: `/api-proxy/attachments/download/${uploadedFile.id}`,
+                        size: formattedSize
+                      };
+                      
+                      const updatedDocs = [...(t.docs || []), newDoc];
+                      await updateTask(t.wbs, { docs: updatedDocs });
+                      alert(`✓ File "${file.name}" attached successfully!`);
+                      refetch();
+                    } catch (err: any) {
+                      console.error("Upload error:", err);
+                      alert("Network error: Failed to reach the upload server.");
+                    }
                   }
                 }}
               />
@@ -1265,6 +1365,349 @@ export default function WbsPage() {
               </div>
 
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* WBS Import Modal */}
+      {isImportModalOpen && (
+        <div className="fixed inset-0 bg-navy/40 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200 animate-in">
+          <div className="bg-white rounded-xl shadow-2xl max-w-3xl w-full border border-slate-200 overflow-hidden flex flex-col max-h-[90vh] animate-in zoom-in-95 duration-200">
+            {/* Header */}
+            <div className="px-6 py-4 border-b border-slate-150 flex items-center justify-between bg-slate-50">
+              <div className="flex items-center gap-2">
+                <Upload className="w-5 h-5 text-dc-blue" />
+                <h3 className="font-black text-navy text-sm uppercase tracking-wider">Import WBS Spreadsheet</h3>
+              </div>
+              <button 
+                onClick={() => setIsImportModalOpen(false)}
+                className="text-slate-400 hover:text-slate-600 transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Stepper Indication Header */}
+            <div className="px-6 py-3 bg-slate-50/50 border-b border-slate-100 flex items-center gap-4 text-xs font-bold text-slate-500">
+              <div className="flex items-center gap-1.5">
+                <span className={cn(
+                  "w-5 h-5 rounded-full flex items-center justify-center text-[10px]",
+                  importStep === 1 ? "bg-dc-blue text-white" : "bg-green-100 text-green-700"
+                )}>
+                  {importStep > 1 ? "✓" : "1"}
+                </span>
+                <span>Upload File</span>
+              </div>
+              <div className="w-8 h-px bg-slate-200" />
+              <div className="flex items-center gap-1.5">
+                <span className={cn(
+                  "w-5 h-5 rounded-full flex items-center justify-center text-[10px]",
+                  importStep === 2 ? "bg-dc-blue text-white" : importStep > 2 ? "bg-green-100 text-green-700" : "bg-slate-200 text-slate-500"
+                )}>
+                  {importStep > 2 ? "✓" : "2"}
+                </span>
+                <span>Map & Preview</span>
+              </div>
+              <div className="w-8 h-px bg-slate-200" />
+              <div className="flex items-center gap-1.5">
+                <span className={cn(
+                  "w-5 h-5 rounded-full flex items-center justify-center text-[10px]",
+                  importStep === 3 ? "bg-dc-blue text-white" : "bg-slate-200 text-slate-500"
+                )}>
+                  3
+                </span>
+                <span>Done</span>
+              </div>
+            </div>
+
+            {/* Content Pane */}
+            <div className="p-6 overflow-y-auto flex-1 space-y-4">
+              
+              {/* STEP 1: UPLOAD */}
+              {importStep === 1 && (
+                <div className="space-y-4">
+                  <div className="border-2 border-dashed border-slate-300 hover:border-dc-blue rounded-xl p-8 text-center bg-slate-50/50 hover:bg-slate-50 transition-all flex flex-col items-center justify-center gap-3 group relative cursor-pointer">
+                    <input 
+                      type="file" 
+                      accept=".xlsx,.xls,.csv"
+                      onChange={handleFileChange}
+                      className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
+                    />
+                    <div className="w-12 h-12 rounded-full bg-slate-100 group-hover:bg-blue-50 text-slate-400 group-hover:text-dc-blue flex items-center justify-center transition-colors">
+                      <UploadCloud className="w-6 h-6 animate-pulse" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-bold text-navy">Drag & Drop WBS spreadsheet or click to browse</p>
+                      <p className="text-[10px] text-slate-400 mt-1 font-medium">Supports Microsoft Excel (.xlsx, .xls) and standard text formats (.csv)</p>
+                    </div>
+                  </div>
+
+                  {isUploading && (
+                    <div className="flex flex-col items-center gap-2 py-4">
+                      <div className="w-8 h-8 border-4 border-dc-blue border-t-transparent rounded-full animate-spin"></div>
+                      <p className="text-xs font-bold text-slate-500">Analyzing schema & validating rows...</p>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* STEP 2: PREVIEW & MAP */}
+              {importStep === 2 && importPreview && (
+                <div className="space-y-5">
+                  
+                  {/* File Stats Summary */}
+                  <div className="bg-slate-50 border border-slate-150 rounded-lg p-3 grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+                    <div>
+                      <span className="text-[9px] font-black text-slate-400 block uppercase">Parsed File</span>
+                      <span className="font-bold text-navy truncate block">{importFile?.name}</span>
+                    </div>
+                    <div>
+                      <span className="text-[9px] font-black text-slate-400 block uppercase">Total Rows</span>
+                      <span className="font-bold text-navy block">{importPreview.total_rows} rows</span>
+                    </div>
+                    <div>
+                      <span className="text-[9px] font-black text-slate-400 block uppercase">Parseable WBS Nodes</span>
+                      <span className="font-bold text-emerald-600 block">{importPreview.parsed_rows} complete</span>
+                    </div>
+                    <div>
+                      <span className="text-[9px] font-black text-slate-400 block uppercase">Skipped Rows</span>
+                      <span className="font-bold text-slate-500 block">{importPreview.skipped} skipped</span>
+                    </div>
+                  </div>
+
+                  {/* Mode Config */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="bg-white border border-slate-200 rounded-lg p-4 space-y-3">
+                      <h4 className="text-[10px] font-black text-navy uppercase tracking-wider border-b pb-1.5">Import Execution Mode</h4>
+                      
+                      <div className="space-y-2">
+                        <label className="flex items-start gap-2.5 cursor-pointer text-xs">
+                          <input 
+                            type="radio" 
+                            name="importMode" 
+                            checked={importMode === "update"}
+                            onChange={() => setImportMode("update")}
+                            className="mt-0.5 accent-dc-blue"
+                          />
+                          <div>
+                            <span className="font-bold text-navy block">Update & Merge Timeline</span>
+                            <span className="text-[10px] text-slate-400 font-medium block mt-0.5 leading-normal">
+                              Matches by WBS code. Updates status, notes, and actuals. Non-conflicting items are appended.
+                            </span>
+                          </div>
+                        </label>
+
+                        <label className="flex items-start gap-2.5 cursor-pointer text-xs mt-3">
+                          <input 
+                            type="radio" 
+                            name="importMode" 
+                            checked={importMode === "replace"}
+                            onChange={() => setImportMode("replace")}
+                            className="mt-0.5 accent-red-500"
+                          />
+                          <div>
+                            <span className="font-bold text-red-600 block">Replace Entire WBS</span>
+                            <span className="text-[10px] text-slate-400 font-medium block mt-0.5 leading-normal">
+                              Deletes ALL current tasks and milestones for this project first and uploads a clean slate.
+                            </span>
+                          </div>
+                        </label>
+                      </div>
+                    </div>
+
+                    <div className="bg-white border border-slate-200 rounded-lg p-4 flex flex-col justify-between">
+                      <div className="space-y-1.5">
+                        <h4 className="text-[10px] font-black text-navy uppercase tracking-wider border-b pb-1.5">Duplicate Strategy</h4>
+                        
+                        <label className="flex items-center gap-2 cursor-pointer text-xs py-1.5 mt-2">
+                          <input 
+                            type="checkbox"
+                            checked={replaceDuplicates}
+                            onChange={(e) => setReplaceDuplicates(e.target.checked)}
+                            className="rounded border-slate-300 text-dc-blue focus:ring-dc-blue font-bold"
+                            disabled={importMode === "replace"}
+                          />
+                          <div>
+                            <span className="font-bold text-navy">Overwrite Duplicate WBS Nodes</span>
+                            <span className="text-[10px] text-slate-400 font-medium block mt-0.5 leading-normal">
+                              If unchecked, existing nodes will be skipped during WBS parsing.
+                            </span>
+                          </div>
+                        </label>
+                      </div>
+
+                      {importPreview.duplicate_wbs && importPreview.duplicate_wbs.length > 0 && (
+                        <div className="mt-2 text-[10px] font-bold text-amber-600 bg-amber-50 border border-amber-100 p-2 rounded">
+                          Found {importPreview.duplicate_wbs.length} duplicate codes (e.g. {importPreview.duplicate_wbs.slice(0, 5).join(", ")})
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Warning Alerts */}
+                  {importPreview.warnings && importPreview.warnings.length > 0 && (
+                    <div className="bg-red-50 border border-red-100 rounded-lg p-4 space-y-2">
+                      <div className="flex items-center gap-2 text-xs font-black text-red-700 uppercase tracking-wider">
+                        <ShieldAlert className="w-4 h-4" />
+                        <span>Parsing Warnings ({importPreview.warnings.length})</span>
+                      </div>
+                      <div className="max-h-24 overflow-y-auto divide-y divide-red-100/50 text-[10px] font-semibold text-red-600">
+                        {importPreview.warnings.map((w: any, idx: number) => (
+                          <div key={idx} className="py-1">
+                            <span className="font-bold mr-1.5">Row {w.row}:</span> {w.message}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Preview Table */}
+                  <div className="space-y-1.5">
+                    <h4 className="text-[10px] font-black text-navy uppercase tracking-wider">Timeline Grid Preview (Top 200 Rows)</h4>
+                    <div className="border border-slate-200 rounded-lg overflow-x-auto max-h-56 shadow-inner">
+                      <table className="w-full border-collapse text-[10px] text-left">
+                        <thead>
+                          <tr className="bg-navy text-gold font-bold sticky top-0 uppercase tracking-wider border-b border-slate-800">
+                            <th className="py-2 px-3">WBS</th>
+                            <th className="py-2 px-2">Level</th>
+                            <th className="py-2 px-3">Task Name</th>
+                            <th className="py-2 px-2 text-center">Phase</th>
+                            <th className="py-2 px-2 text-center">Disc</th>
+                            <th className="py-2 px-2 text-center">Wks</th>
+                            <th className="py-2 px-2 text-right">Plan Hr</th>
+                            <th className="py-2 px-2">Status</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100 font-medium">
+                          {importPreview.preview_data.map((r: any, idx: number) => {
+                            return (
+                              <tr key={idx} className={cn(
+                                "hover:bg-slate-50/50",
+                                r.level === 1 && "bg-slate-50 font-bold",
+                                r.level === 2 && "font-semibold"
+                              )}>
+                                <td className="py-1.5 px-3 font-mono font-bold text-slate-500">{r.wbs_raw}</td>
+                                <td className="py-1.5 px-2 text-slate-400">{r.level}</td>
+                                <td className="py-1.5 px-3 truncate max-w-[200px]" style={{ paddingLeft: `${r.level * 8}px` }}>
+                                  {r.name}
+                                </td>
+                                <td className="py-1.5 px-2 text-center text-slate-500">{r.phase || "—"}</td>
+                                <td className="py-1.5 px-2 text-center text-slate-500">{r.discipline || "—"}</td>
+                                <td className="py-1.5 px-2 text-center text-slate-500">
+                                  {r.finish_wk - r.start_wk + 1}
+                                </td>
+                                <td className="py-1.5 px-2 text-right text-slate-600 font-mono">{r.effort_hr}</td>
+                                <td className="py-1.5 px-2">
+                                  <span className={cn(
+                                    "px-1.5 py-0.5 rounded text-[8px] font-black uppercase tracking-wider",
+                                    r.status === "DONE" && "bg-green-100 text-green-700",
+                                    r.status === "IN PROGRESS" && "bg-blue-100 text-blue-700",
+                                    r.status === "NOT STARTED" && "bg-slate-100 text-slate-500"
+                                  )}>
+                                    {r.status}
+                                  </span>
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* STEP 3: SUCCESS RESULT */}
+              {importStep === 3 && (
+                <div className="flex flex-col items-center justify-center text-center p-8 space-y-4 animate-in fade-in duration-300">
+                  <div className="w-16 h-16 rounded-full bg-emerald-50 text-emerald-600 border border-emerald-100 flex items-center justify-center text-3xl shadow-inner animate-bounce">
+                    ✓
+                  </div>
+                  <div>
+                    <h3 className="text-base font-black text-navy uppercase tracking-wider">Import Completed Successfully</h3>
+                    <p className="text-xs text-slate-500 mt-1 max-w-sm mx-auto leading-relaxed">
+                      Your project WBS sheet has been fully committed to the central database. WBS node summaries are rolled up automatically.
+                    </p>
+                  </div>
+
+                  <div className="bg-slate-50 border border-slate-150 rounded-lg p-5 max-w-md w-full grid grid-cols-2 gap-4 text-left text-xs font-bold">
+                    <div className="border-r border-slate-200 pr-4 space-y-1.5">
+                      <div className="flex justify-between">
+                        <span className="text-slate-400">Imported nodes:</span>
+                        <span className="text-emerald-600 font-mono">{(importPreview as any)?.imported_count || 0}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-slate-400">Overwritten:</span>
+                        <span className="text-blue-600 font-mono">{(importPreview as any)?.replaced_count || 0}</span>
+                      </div>
+                    </div>
+                    <div className="pl-4 space-y-1.5">
+                      <div className="flex justify-between">
+                        <span className="text-slate-400">Purged/Replaced:</span>
+                        <span className="text-red-500 font-mono">{(importPreview as any)?.deleted_count || 0}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-slate-400">Skipped (duplicate):</span>
+                        <span className="text-slate-500 font-mono">{(importPreview as any)?.skipped_count || 0}</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+            </div>
+
+            {/* Footer */}
+            <div className="px-6 py-4 border-t border-slate-150 bg-slate-50 flex items-center justify-between gap-3">
+              {importStep === 1 && (
+                <>
+                  <div className="text-[10px] text-slate-400 font-semibold italic">
+                    * Make sure first row contains column headers matching alias guidelines.
+                  </div>
+                  <button 
+                    onClick={() => setIsImportModalOpen(false)}
+                    className="bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 text-xs font-bold px-4 py-2 rounded transition-colors"
+                  >
+                    Close
+                  </button>
+                </>
+              )}
+
+              {importStep === 2 && (
+                <>
+                  <button 
+                    onClick={() => {
+                      setImportStep(1);
+                      setImportPreview(null);
+                    }}
+                    className="bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 text-xs font-bold px-4 py-2 rounded transition-colors"
+                  >
+                    Back to Upload
+                  </button>
+                  <button 
+                    onClick={handleConfirmImport}
+                    className="bg-dc-blue hover:bg-dc-deep text-white text-xs font-bold px-5 py-2 rounded shadow-sm flex items-center gap-1.5 transition-all border border-dc-blue"
+                  >
+                    <Check className="w-4 h-4" />
+                    <span>Confirm & Commit WBS</span>
+                  </button>
+                </>
+              )}
+
+              {importStep === 3 && (
+                <div className="flex justify-end w-full">
+                  <button 
+                    onClick={() => {
+                      setIsImportModalOpen(false);
+                      refetch();
+                    }}
+                    className="bg-dc-blue hover:bg-dc-deep text-white text-xs font-bold px-5 py-2 rounded shadow-sm transition-all"
+                  >
+                    Done — View WBS
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       )}

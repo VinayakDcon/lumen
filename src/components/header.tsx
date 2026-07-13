@@ -3,8 +3,8 @@
 import React, { useState, useRef, useEffect } from "react";
 import { usePmoStore } from "@/store/use-pmo-store";
 import { 
-  Bell, FileSpreadsheet, Printer, Search,
-  Eye, EyeOff, LogOut, Settings, Menu
+  Bell,
+  Eye, EyeOff, LogOut, Settings, Menu, Sun, Moon
 } from "lucide-react";
 import { cn } from "@/utils/cn";
 import { usePathname } from "next/navigation";
@@ -24,6 +24,8 @@ export function Header() {
   const toggleSidebar = usePmoStore((state) => state.toggleSidebar);
   const toggleMobileSidebar = usePmoStore((state) => state.toggleMobileSidebar);
   const openProgrammeWizard = usePmoStore((state) => state.openProgrammeWizard);
+
+
 
 
   const { data: activeProgramme } = useActiveProgrammeQuery(activeProgrammeId);
@@ -112,7 +114,7 @@ export function Header() {
           <h1 className="font-bold text-sm sm:text-base text-navy truncate leading-none">
           {getPageTitle()}
           </h1>
-          {(pathname === "/portfolio" || pathname === "/" || pathname?.startsWith("/programme") || pathname?.startsWith("/track")) && activeProgramme && (
+          {(pathname?.startsWith("/programme") || pathname?.startsWith("/track")) && activeProgramme && (
             <span className="text-xs sm:text-sm text-slate-500 font-semibold truncate leading-none">
               {activeProgramme.name}
             </span>
@@ -122,42 +124,14 @@ export function Header() {
 
       {/* Topbar Right - Actions and Profile */}
       <div className="flex items-center gap-3">
-        {/* Quick Search trigger */}
-        <button 
-          className="text-xs text-slate-500 border border-slate-200 rounded px-2.5 py-1.5 hover:bg-slate-50 flex items-center gap-1.5 transition-colors cursor-pointer hidden sm:flex bg-white"
-          onClick={() => alert("⌘K Search trigger placeholder")}
-        >
-          <Search className="w-3.5 h-3.5 text-slate-400" />
-          <span>⌘K Search</span>
-        </button>
-
-        {/* Global Action buttons */}
-        <div className="hidden sm:flex items-center gap-1.5 border-r border-slate-200 pr-3 mr-1">
+        {(user?.role === "PMO" || user?.role === "ADMIN" || user?.role === "PROJECT_MANAGER") && (
           <button 
-            className="text-xs text-slate-600 border border-slate-200 rounded px-2.5 py-1.5 hover:bg-slate-50 flex items-center gap-1.5 transition-colors cursor-pointer bg-white"
-            title="Generate Health PDF"
-            onClick={() => alert("Printing Health Report PDF...")}
+            onClick={() => openProgrammeWizard("create")}
+            className="bg-dc-blue hover:bg-dc-deep text-white px-3 py-1.5 rounded text-xs font-bold flex items-center gap-1 cursor-pointer transition-colors shadow-sm mr-1"
           >
-            <Printer className="w-3.5 h-3.5 text-slate-500" />
-            <span>Health</span>
+            <span>+ New Project</span>
           </button>
-          <button 
-            className="text-xs text-slate-600 border border-slate-200 rounded px-2.5 py-1.5 hover:bg-slate-50 flex items-center gap-1.5 transition-colors cursor-pointer bg-white"
-            title="Export WBS to Excel"
-            onClick={() => alert("Exporting WBS to Excel...")}
-          >
-            <FileSpreadsheet className="w-3.5 h-3.5 text-slate-500" />
-            <span>Excel</span>
-          </button>
-          {(user?.role === "PMO" || user?.role === "ADMIN" || user?.role === "PROJECT_MANAGER") && (
-            <button 
-              onClick={() => openProgrammeWizard("create")}
-              className="bg-dc-blue hover:bg-dc-deep text-white px-3 py-1.5 rounded text-xs font-bold flex items-center gap-1 cursor-pointer transition-colors shadow-sm"
-            >
-              <span>+ New Project</span>
-            </button>
-          )}
-        </div>
+        )}
 
         {/* Financial Visibility Toggle */}
         {/* <button
@@ -182,6 +156,8 @@ export function Header() {
             </>
           )}
         </button> */}
+
+
 
         {/* Notification Bell Panel */}
         <div className="relative" ref={notifMenuRef}>

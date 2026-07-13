@@ -1,10 +1,10 @@
 "use client";
 
-import React from "react";
+import React, { useState } from "react";
 import { usePmoStore } from "@/store/use-pmo-store";
-import { useCharterQuery } from "@/hooks/use-pmo-queries";
+import { useCharterQuery, useTasksQuery, useCustomerCommsQuery } from "@/hooks/use-pmo-queries";
 import { 
-  Printer, Mail, FileText, AlertTriangle, Users, Trophy, CheckSquare
+  Printer, Mail, FileText, AlertTriangle, Users, Trophy, CheckSquare, X, Copy, ExternalLink
 } from "lucide-react";
 import { JourneyPhase, JourneyMilestone, CharterRisk, DpdsDeliverable, Person } from "@/types/pmo";
 import { cn } from "@/utils/cn";
@@ -12,6 +12,21 @@ import { cn } from "@/utils/cn";
 export default function ProjectCharterPage() {
   const activeProgrammeId = usePmoStore((state) => state.activeProgrammeId);
   const { data: charterData, isLoading } = useCharterQuery(activeProgrammeId);
+  const { data: tasksData } = useTasksQuery(activeProgrammeId);
+  const { data: commsData } = useCustomerCommsQuery(activeProgrammeId);
+
+  const [emailModal, setEmailModal] = useState<{
+    isOpen: boolean;
+    title: string;
+    subject: string;
+    body: string;
+  }>({
+    isOpen: false,
+    title: "",
+    subject: "",
+    body: ""
+  });
+  const [isCopied, setIsCopied] = useState(false);
 
   if (isLoading) {
     return (
@@ -40,46 +55,198 @@ export default function ProjectCharterPage() {
   const totalWeeks = programme.programme_weeks || 56;
   const todayWk = journey?.todayWk || 1;
 
-  // Handler for toolbar actions (mocked UI notifications)
-  const handleAction = (actionName: string) => {
-    alert(`${actionName} action triggered successfully! (Pure Client Simulation)`);
+  const handlePrintCharter = () => {
+    const content = document.getElementById("charter-content");
+    if (!content) return;
+    const win = window.open("", "_blank");
+    if (!win) {
+      alert("Popup blocker prevented printing. Please allow popups for this site.");
+      return;
+    }
+    win.document.write(`
+      <html>
+        <head>
+          <title>Project Charter - ${programme.name}</title>
+          <style>
+            body { background: white !important; padding: 40px !important; font-family: sans-serif; }
+            .no-print { display: none !important; }
+          </style>
+        </head>
+        <body>
+          <div class="space-y-6">
+            ${content.innerHTML}
+          </div>
+        </body>
+      </html>
+    `);
+    
+    // Copy stylesheets
+    document.querySelectorAll('link[rel="stylesheet"], style').forEach(node => {
+      win.document.head.appendChild(node.cloneNode(true));
+    });
+    
+    win.document.close();
+    win.focus();
+    setTimeout(() => {
+      win.print();
+      win.close();
+    }, 500);
+  };
+
+  const handleEmailSummary = (kind: "weekly" | "stakeholder" | "risk" | "customer") => {
+    let subject = "";
+    let body = "";
+
+    const recentDone = (tasksData || [])
+      .filter((t: any) => t.status === "DONE" || t.status === "COMPLETE" || t.status === "COMPLETED")
+      .slice(-5);
+    const inProgress = (tasksData || [])
+      .filter((t: any) => t.status === "IN PROGRESS")
+      .slice(0, 8);
+    const upcomingMs = (journey?.milestones || [])
+      .filter((m: any) => m.status === "PENDING")
+      .slice(0, 5);
+    const openRisks = (risks || [])
+      .filter((r: any) => r.status === "OPEN" || !r.status);
+    const recentComms = (commsData || []).slice(0, 3);
+
+    const fmtNum = (val: number | null | undefined) => {
+      if (val === null || val === undefined) return "0";
+      return typeof val === "number" ? val.toFixed(1) : val;
+    };
+
+    if (kind === "weekly") {
+      subject = `[${programme.name}] Weekly Status · Wk ${todayWk}`;
+      body = `Hi team,
+
+Weekly status for ${programme.name} (Wk ${todayWk} of ${totalWeeks}):
+
+PROGRESS · ${metrics?.avgPercentComplete || 0}% overall
+- Tasks Done: ${(metrics?.byStatus || []).find((s: any) => s.status === 'DONE')?.c || 0} / ${metrics?.totalTasks || 0}
+- In Progress: ${(metrics?.byStatus || []).find((s: any) => s.status === 'IN PROGRESS')?.c || 0}
+- Hours actual / planned: ${fmtNum(metrics?.actualEffortHr)} / ${fmtNum(metrics?.totalEffortHr)}
+- Open risks: ${metrics?.risksOpen || 0}
+- Milestones done: ${metrics?.milestonesDone || 0} / ${(metrics?.milestonesDone || 0) + (metrics?.milestonesPending || 0)}
+
+THIS WEEK · highlights:
+${recentDone.map((t: any) => `  ✓ ${t.wbs} · ${t.name}`).join('\n')}
+
+NEXT WEEK · in flight:
+${inProgress.map((t: any) => `  ▸ ${t.wbs} · ${t.name} (${t.percent_complete}%)`).join('\n')}
+
+UPCOMING MILESTONES (next ${upcomingMs.length}):
+${upcomingMs.map((m: any) => `  • Wk ${m.week} · ${m.event}`).join('\n')}
+
+OPEN RISKS · top ${Math.min(3, openRisks.length)}:
+${openRisks.slice(0, 3).map((r: any) => `  ⚠ ${r.id} · ${r.description} (${r.probability}/${r.impact})`).join('\n')}
+
+— ${programme.created_by || 'Programme Manager'}
+DContour Litetech Pvt. Ltd.`;
+    } else if (kind === "stakeholder") {
+      subject = `[${programme.name}] Stakeholder digest · ${new Date().toLocaleDateString()}`;
+      body = `${programme.name}
+Customer: ${programme.customer || "—"}
+Status: ${programme.status} · Wk ${todayWk} of ${totalWeeks}
+
+HEADLINE
+- Programme tracking at ${metrics?.avgPercentComplete || 0}% complete
+- Milestones: ${metrics?.milestonesDone || 0} of ${(metrics?.milestonesDone || 0) + (metrics?.milestonesPending || 0)} delivered
+- Kits shipped: ${metrics?.kitsShipped || 0} of ${programme.total_kits || 0}
+- Open risks: ${metrics?.risksOpen || 0}
+
+KEY ACHIEVEMENTS
+${recentDone.slice(0, 4).map((t: any) => `  ✓ ${t.name}`).join('\n')}
+
+UPCOMING (next 4 weeks)
+${upcomingMs.slice(0, 4).map((m: any) => `  • Wk ${m.week} · ${m.event}`).join('\n')}
+
+CONCERNS / RISKS
+${openRisks.slice(0, 3).map((r: any) => `  ⚠ ${r.description}`).join('\n') || '  No high-priority risks'}
+
+— DContour Programme Office`;
+    } else if (kind === "risk") {
+      subject = `[${programme.name}] Risk Update · ${new Date().toLocaleDateString()}`;
+      body = `Risk Register Update — ${programme.name}
+
+Total: ${risks.length} risks · ${openRisks.length} OPEN
+
+OPEN RISKS · by priority:
+${openRisks.map((r: any) => `  [${r.id}] ${r.area} · ${r.description}
+     Probability: ${r.probability} · Impact: ${r.impact} · Owner: ${r.owner}
+     Mitigation: ${r.mitigation}`).join('\n\n')}
+
+— ${programme.created_by || 'Programme Manager'}`;
+    } else if (kind === "customer") {
+      subject = `[${programme.name}] Status update for ${programme.customer || "Customer"}`;
+      body = `Dear ${programme.customer || "Customer"} team,
+
+${programme.name} status update:
+
+PROGRAMME PROGRESS
+- We are at Wk ${todayWk} of ${totalWeeks} (~${metrics?.avgPercentComplete || 0}% complete)
+- ${metrics?.milestonesDone || 0} of ${(metrics?.milestonesDone || 0) + (metrics?.milestonesPending || 0)} milestones delivered
+- ${metrics?.kitsShipped || 0} of ${programme.total_kits || 0} kits shipped to date
+
+RECENT WORK
+${recentDone.slice(0, 5).map((t: any) => `  ✓ ${t.name}`).join('\n')}
+
+UPCOMING DELIVERABLES (next 4 weeks)
+${upcomingMs.slice(0, 4).map((m: any) => `  • Wk ${m.week} · ${m.event}`).join('\n')}
+
+OPEN ITEMS REQUIRING YOUR INPUT
+${recentComms.filter((c: any) => c.direction === 'OUT' && c.status === 'FOLLOW_UP').map((c: any) => `  - ${c.subject} (logged ${c.comm_date})`).join('\n') || '  None at this time'}
+
+Please let us know if you have any questions.
+
+Best regards,
+${programme.created_by || 'Programme Manager'}
+DContour Litetech Pvt. Ltd.`;
+    }
+
+    setEmailModal({
+      isOpen: true,
+      title: kind === "weekly" ? "Weekly Status Email" : kind === "stakeholder" ? "Stakeholder Digest" : kind === "risk" ? "Risk Update" : "Customer Status",
+      subject,
+      body
+    });
+    setIsCopied(false);
   };
 
   return (
     <div className="page-container space-y-6 animate-in fade-in duration-300">
       
       {/* Top Toolbar Action Row */}
-      <div className="flex flex-wrap items-center gap-2 pb-2 border-b border-slate-100">
+      <div className="flex flex-wrap items-center gap-2 pb-2 border-b border-slate-100 no-print">
         <button 
-          onClick={() => handleAction("Print Charter")}
+          onClick={handlePrintCharter}
           className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-navy text-xs font-bold rounded transition-colors"
         >
           <Printer className="w-3.5 h-3.5" />
           <span>Print Charter</span>
         </button>
         <button 
-          onClick={() => handleAction("Weekly Status Email")}
+          onClick={() => handleEmailSummary("weekly")}
           className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-navy text-xs font-bold rounded transition-colors"
         >
           <Mail className="w-3.5 h-3.5" />
           <span>Weekly Status Email</span>
         </button>
         <button 
-          onClick={() => handleAction("Stakeholder Digest")}
+          onClick={() => handleEmailSummary("stakeholder")}
           className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-navy text-xs font-bold rounded transition-colors"
         >
           <FileText className="w-3.5 h-3.5" />
           <span>Stakeholder Digest</span>
         </button>
         <button 
-          onClick={() => handleAction("Risk Update")}
+          onClick={() => handleEmailSummary("risk")}
           className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-navy text-xs font-bold rounded transition-colors"
         >
           <AlertTriangle className="w-3.5 h-3.5" />
           <span>Risk Update</span>
         </button>
         <button 
-          onClick={() => handleAction("Customer Status")}
+          onClick={() => handleEmailSummary("customer")}
           className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-navy text-xs font-bold rounded transition-colors"
         >
           <Users className="w-3.5 h-3.5" />
@@ -87,8 +254,9 @@ export default function ProjectCharterPage() {
         </button>
       </div>
 
-      {/* Hero Header */}
-      <div className="bg-white border border-slate-150 rounded-lg p-6 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <div id="charter-content" className="space-y-6">
+        {/* Hero Header */}
+        <div className="bg-white border border-slate-150 rounded-lg p-6 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <div className="flex items-center gap-3">
             <h1 className="text-2xl font-black text-navy">{programme.name}</h1>
@@ -277,15 +445,15 @@ export default function ProjectCharterPage() {
 
           {/* SVG Proportional Mini Gantt */}
           <div className="overflow-x-auto">
-            <svg viewBox="0 0 800 240" className="w-full min-w-[600px] h-auto border border-slate-100 rounded-lg bg-slate-50/40">
+            <svg viewBox="0 0 800 240" className="w-full min-w-[600px] h-auto border border-slate-100 dark:border-slate-800 rounded-lg bg-slate-50/40 dark:bg-slate-950/40">
               {/* Background week grids */}
               {Array.from({ length: 9 }).map((_, idx) => {
                 const wk = Math.round((idx / 8) * totalWeeks);
                 const x = 50 + (wk / totalWeeks) * 700;
                 return (
                   <g key={idx}>
-                    <line x1={x} y1={25} x2={x} y2={210} stroke="#E2E8F0" strokeWidth={1} strokeDasharray="3,3" />
-                    <text x={x} y={20} fontSize={9} fill="#94A3B8" textAnchor="middle" fontWeight="bold">Wk {wk}</text>
+                    <line x1={x} y1={25} x2={x} y2={210} className="stroke-slate-200 dark:stroke-slate-800" strokeWidth={1} strokeDasharray="3,3" />
+                    <text x={x} y={20} fontSize={9} className="fill-slate-400 dark:fill-slate-500" textAnchor="middle" fontWeight="bold">Wk {wk}</text>
                   </g>
                 );
               })}
@@ -303,12 +471,12 @@ export default function ProjectCharterPage() {
                   return (
                     <g key={idx}>
                       {/* Track rect */}
-                      <rect x={startX} y={barY} width={barW} height={14} rx={3} fill="#E2E8F0" />
+                      <rect x={startX} y={barY} width={barW} height={14} rx={3} className="fill-slate-200 dark:fill-slate-800" />
                       {/* Fill rect */}
                       <rect x={startX} y={barY} width={fillW} height={14} rx={3} fill={ph.colour || "#0B5BAF"} />
                       {/* Label inside or next */}
                       <text x={startX + 6} y={barY + 11} fontSize={8} fill="#FFFFFF" fontWeight="black">{ph.code}</text>
-                      <text x={endX + 6} y={barY + 11} fontSize={9} fill="#475569" fontWeight="bold">
+                      <text x={endX + 6} y={barY + 11} fontSize={9} className="fill-slate-600 dark:fill-slate-300" fontWeight="bold">
                         {ph.name} ({ph.avg_pct}%)
                       </text>
                     </g>
@@ -502,6 +670,85 @@ export default function ProjectCharterPage() {
         </div>
 
       </div>
+
+      </div>
+
+      {/* Email Preview Modal */}
+      {emailModal.isOpen && (
+        <div className="fixed inset-0 bg-navy/40 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
+          <div className="bg-white rounded-xl shadow-2xl max-w-2xl w-full border border-slate-200 overflow-hidden flex flex-col max-h-[90vh] animate-in zoom-in-95 duration-200">
+            {/* Header */}
+            <div className="px-6 py-4 border-b border-slate-150 flex items-center justify-between bg-slate-50">
+              <div className="flex items-center gap-2">
+                <Mail className="w-5 h-5 text-dc-blue" />
+                <h3 className="font-black text-navy text-sm uppercase tracking-wider">{emailModal.title}</h3>
+              </div>
+              <button 
+                onClick={() => setEmailModal(prev => ({ ...prev, isOpen: false }))}
+                className="text-slate-400 hover:text-slate-600 transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Content */}
+            <div className="p-6 overflow-y-auto space-y-4">
+              <div>
+                <label className="text-[10px] font-black text-slate-400 block uppercase tracking-wider mb-1">Email Subject</label>
+                <input 
+                  type="text" 
+                  readOnly 
+                  value={emailModal.subject}
+                  className="w-full border border-slate-200 rounded px-3 py-2 text-xs font-bold text-slate-700 bg-slate-50 focus:outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="text-[10px] font-black text-slate-400 block uppercase tracking-wider mb-1">Email Body</label>
+                <pre className="w-full border border-slate-200 rounded p-4 text-xs font-semibold text-slate-600 bg-slate-50/50 overflow-auto whitespace-pre-wrap font-mono leading-relaxed max-h-[300px]">
+                  {emailModal.body}
+                </pre>
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="px-6 py-4 border-t border-slate-150 bg-slate-50 flex items-center justify-between gap-3">
+              <button
+                onClick={() => {
+                  navigator.clipboard.writeText(emailModal.body);
+                  setIsCopied(true);
+                  setTimeout(() => setIsCopied(false), 2000);
+                }}
+                className={cn(
+                  "px-4 py-2 text-xs font-bold rounded flex items-center gap-1.5 transition-all shadow-sm border",
+                  isCopied
+                    ? "border-green-300 bg-green-50 text-green-700 hover:bg-green-100"
+                    : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
+                )}
+              >
+                <Copy className="w-4 h-4" />
+                <span>{isCopied ? "Copied!" : "Copy to Clipboard"}</span>
+              </button>
+
+              <div className="flex gap-2">
+                <a
+                  href={`mailto:?subject=${encodeURIComponent(emailModal.subject)}&body=${encodeURIComponent(emailModal.body)}`}
+                  className="px-4 py-2 bg-dc-blue hover:bg-dc-deep text-white text-xs font-bold rounded flex items-center gap-1.5 transition-all shadow-sm border border-dc-blue flex items-center justify-center"
+                >
+                  <ExternalLink className="w-4 h-4" />
+                  <span>Open in Email Client</span>
+                </a>
+                <button
+                  onClick={() => setEmailModal(prev => ({ ...prev, isOpen: false }))}
+                  className="btn-secondary px-4 py-2 text-xs font-bold rounded"
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
     </div>
   );

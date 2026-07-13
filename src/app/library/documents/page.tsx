@@ -4,7 +4,7 @@ import React, { useState, useMemo } from "react";
 import { usePmoStore } from "@/store/use-pmo-store";
 import { useActiveProgrammeQuery, useDocumentsQuery } from "@/hooks/use-pmo-queries";
 import { 
-  FileText, Search, Plus, Edit3, X, RefreshCw, Link as LinkIcon
+  FileText, Search, Plus, Edit3, X, RefreshCw, Link as LinkIcon, Download, Trash2, Upload
 } from "lucide-react";
 import { cn } from "@/utils/cn";
 import { ProjectDocument } from "@/types/pmo";
@@ -19,6 +19,65 @@ export default function DocumentsPage() {
   const { data: documents = [], isLoading: isDocsLoading } = useDocumentsQuery(activeProgrammeId);
 
   const isLoading = isProgLoading || isDocsLoading;
+
+  const [attachments, setAttachments] = useState<any[]>([]);
+  const [isAttachmentsLoading, setIsAttachmentsLoading] = useState(true);
+
+  const fetchAttachments = async () => {
+    try {
+      const res = await fetch("/api-proxy/attachments");
+      if (res.ok) {
+        const list = await res.json();
+        setAttachments(list);
+      }
+    } catch (err) {
+      console.error("Failed to fetch WBS attachments:", err);
+    } finally {
+      setIsAttachmentsLoading(false);
+    }
+  };
+
+  React.useEffect(() => {
+    fetchAttachments();
+  }, []);
+
+  const handleUpdateAttachment = async (id: number, file: File) => {
+    const formData = new FormData();
+    formData.append("file", file);
+    try {
+      const res = await fetch(`/api-proxy/attachments/update/${id}`, {
+        method: "POST",
+        body: formData
+      });
+      if (res.ok) {
+        alert("✓ Attachment updated successfully!");
+        fetchAttachments();
+      } else {
+        const errData = await res.json();
+        alert(errData.error || "Failed to update attachment");
+      }
+    } catch (err) {
+      alert("Network error: Failed to update file.");
+    }
+  };
+
+  const handleDeleteAttachment = async (id: number, originalName: string) => {
+    if (confirm(`Are you sure you want to permanently delete the attachment "${originalName}"?\nThis action cannot be undone.`)) {
+      try {
+        const res = await fetch(`/api-proxy/attachments/${id}`, {
+          method: "DELETE"
+        });
+        if (res.ok) {
+          alert("✓ Attachment deleted successfully.");
+          fetchAttachments();
+        } else {
+          alert("Failed to delete attachment.");
+        }
+      } catch (err) {
+        alert("Network error: Failed to delete attachment.");
+      }
+    }
+  };
 
   // Filter states
   const [searchQuery, setSearchQuery] = useState("");
@@ -280,6 +339,119 @@ export default function DocumentsPage() {
         </div>
       </div>
 
+      {/* WBS Task Attachments Section */}
+      <div className="mt-8 space-y-4">
+        <div>
+          <h2 className="text-lg font-bold text-navy flex items-center gap-2">
+            <FileText className="w-5 h-5 text-dc-blue" />
+            WBS Task Attachments
+          </h2>
+          <p className="text-xs text-slate-500 mt-0.5">
+            Files uploaded directly by engineers inside project Work Breakdown Structure (WBS) tasks.
+          </p>
+        </div>
+
+        <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-sm">
+              <thead className="bg-slate-50 text-slate-700 font-semibold uppercase text-[10px] tracking-wider border-b border-slate-100">
+                <tr>
+                  <th className="px-6 py-3 w-16">ID</th>
+                  <th className="px-6 py-3">Project Name</th>
+                  <th className="px-6 py-3">WBS / Task Name</th>
+                  <th className="px-6 py-3">File Name</th>
+                  <th className="px-6 py-3">Size</th>
+                  <th className="px-6 py-3">Author</th>
+                  <th className="px-6 py-3">Uploaded</th>
+                  <th className="px-6 py-3 text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {isAttachmentsLoading ? (
+                  <tr>
+                    <td colSpan={8} className="px-6 py-8 text-center text-slate-400">
+                      <div className="w-5 h-5 border-2 border-dc-blue border-t-transparent rounded-full animate-spin mx-auto mb-2"></div>
+                      <span>Loading attachments...</span>
+                    </td>
+                  </tr>
+                ) : attachments.length === 0 ? (
+                  <tr>
+                    <td colSpan={8} className="px-6 py-8 text-center text-slate-500">
+                      <FileText className="w-10 h-10 text-slate-350 mx-auto mb-2" />
+                      <p className="font-semibold text-slate-600">No WBS attachments found</p>
+                      <p className="text-xs text-slate-400 mt-0.5">Attach files to tasks in the WBS tab to see them here.</p>
+                    </td>
+                  </tr>
+                ) : (
+                  attachments.map((att) => {
+                    const formattedSize = att.size_bytes > 1024 * 1024
+                      ? `${(att.size_bytes / (1024 * 1024)).toFixed(1)} MB`
+                      : `${(att.size_bytes / 1024).toFixed(0)} KB`;
+                    
+                    return (
+                      <tr key={att.id} className="hover:bg-slate-50/80 transition-colors group text-xs">
+                        <td className="px-6 py-3 font-mono text-slate-400">#{att.id}</td>
+                        <td className="px-6 py-3 font-bold text-navy">{att.programme_name || "Unknown Project"}</td>
+                        <td className="px-6 py-3">
+                          <div className="flex flex-col">
+                            <span className="font-mono text-[10px] text-slate-400 font-bold">{att.wbs}</span>
+                            <span className="text-slate-700 font-medium truncate max-w-[200px]" title={att.task_name}>{att.task_name || "—"}</span>
+                          </div>
+                        </td>
+                        <td className="px-6 py-3 font-semibold text-slate-700 max-w-[220px] truncate" title={att.original_name}>
+                          {att.original_name}
+                        </td>
+                        <td className="px-6 py-3 text-slate-500 font-mono">{formattedSize}</td>
+                        <td className="px-6 py-3 text-slate-650 font-medium">{att.uploaded_by}</td>
+                        <td className="px-6 py-3 text-slate-500">{att.uploaded_at?.replace('T', ' ').substring(0, 16)}</td>
+                        <td className="px-6 py-3 text-right">
+                          <div className="flex items-center gap-1.5 justify-end">
+                            <a 
+                              href={`/api-proxy/attachments/download/${att.id}`} 
+                              target="_blank" 
+                              rel="noreferrer"
+                              className="p-1.5 text-slate-400 hover:text-dc-blue hover:bg-blue-50 rounded transition-colors"
+                              title="Download/Open File"
+                            >
+                              <Download className="w-3.5 h-3.5" />
+                            </a>
+
+                            <label 
+                              className="p-1.5 text-slate-400 hover:text-amber-600 hover:bg-amber-50 rounded transition-colors cursor-pointer"
+                              title="Replace/Update File"
+                            >
+                              <Upload className="w-3.5 h-3.5" />
+                              <input 
+                                type="file" 
+                                className="hidden" 
+                                onChange={(e) => {
+                                  const file = e.target.files?.[0];
+                                  if (file) {
+                                    handleUpdateAttachment(att.id, file);
+                                  }
+                                }}
+                              />
+                            </label>
+
+                            <button 
+                              onClick={() => handleDeleteAttachment(att.id, att.original_name)}
+                              className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded transition-colors"
+                              title="Delete Attachment"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
       {/* Add/Edit Modal */}
       {isModalOpen && (
         <div className="fixed inset-0 bg-navy/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
@@ -392,7 +564,7 @@ export default function DocumentsPage() {
               <button 
                 type="button"
                 onClick={() => setIsModalOpen(false)}
-                className="px-4 py-2 text-sm font-bold text-slate-600 hover:text-navy hover:bg-slate-200/50 rounded-lg transition-colors"
+                className="btn-secondary"
               >
                 Cancel
               </button>

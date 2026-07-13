@@ -77,6 +77,7 @@ export function Sidebar() {
         { label: "Team Hours", href: "/timesheet/team", icon: Users2 },
         { label: "Approve Timesheets", href: "/timesheet/approvals", icon: CheckSquare },
         { label: "Resource Hours", href: "/timesheet/resources", icon: BarChart3 },
+        { label: "Hours Analytics", href: "/timesheet/analytics", icon: LineChart },
       ]
     },
     {

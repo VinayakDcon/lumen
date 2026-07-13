@@ -32,8 +32,8 @@ export default function TeamHoursPage() {
   // Calculate statistics totals
   const totalHours = filteredEntries.reduce((sum: number, e: any) => sum + (e.hours || 0) + (e.blocked_hours || 0), 0);
   const uniquePeople = Array.from(new Set(filteredEntries.map((e: any) => e.person_id)));
-  const uniqueProgrammes = Array.from(new Set(filteredEntries.map((e: any) => e.programme_id))).filter(id => id !== "DC_BAU");
-  const benchHours = filteredEntries.filter((e: any) => e.programme_id === "DC_BAU").reduce((sum: number, e: any) => sum + (e.hours || 0), 0);
+  const uniqueProgrammes = Array.from(new Set(filteredEntries.map((e: any) => e.programme_id))).filter(id => id && id !== "DC_BAU" && id !== "BENCH_TIME");
+  const benchHours = filteredEntries.filter((e: any) => !e.programme_id || e.programme_id === "DC_BAU" || e.programme_id === "BENCH_TIME").reduce((sum: number, e: any) => sum + (e.hours || 0), 0);
   
   const avgHoursPerPersonWeek = uniquePeople.length > 0
     ? parseFloat((totalHours / (uniquePeople.length * weeksRange)).toFixed(1))
@@ -46,7 +46,7 @@ export default function TeamHoursPage() {
   peopleLogging.sort();
 
   // Get active columns (projects) in the filtered set
-  const projectCols = Array.from(new Set(filteredEntries.filter((e: any) => e.programme_id !== "DC_BAU" && e.programme_id).map((e: any) => e.programme_id as string))) as string[];
+  const projectCols = Array.from(new Set(filteredEntries.filter((e: any) => e.programme_id && e.programme_id !== "DC_BAU" && e.programme_id !== "BENCH_TIME").map((e: any) => e.programme_id as string))) as string[];
   projectCols.sort();
 
   // Map project names / details for visual colors
@@ -65,7 +65,7 @@ export default function TeamHoursPage() {
       projectHours[col] = hrs;
     });
 
-    const bench = personEntries.filter((e: any) => e.programme_id === "DC_BAU").reduce((sum: number, e: any) => sum + (e.hours || 0) + (e.blocked_hours || 0), 0);
+    const bench = personEntries.filter((e: any) => !e.programme_id || e.programme_id === "DC_BAU" || e.programme_id === "BENCH_TIME").reduce((sum: number, e: any) => sum + (e.hours || 0) + (e.blocked_hours || 0), 0);
     const rowTotal = Object.values(projectHours).reduce((sum: number, v: any) => sum + v, 0) + bench;
 
     return {
@@ -113,7 +113,7 @@ export default function TeamHoursPage() {
             onChange={(e) => setWeeksRange(parseInt(e.target.value))}
             className="border border-slate-200 rounded px-3 py-1.5 text-xs focus:outline-none focus:border-dc-blue bg-white text-slate-700 w-36 font-semibold"
           >
-            <option value={1}>This week</option>
+            <option value={-1}>This week</option>
             <option value={1}>Last 1 Week</option>
             <option value={4}>Last 4 weeks</option>
             <option value={8}>Last 8 weeks</option>
@@ -293,7 +293,7 @@ export default function TeamHoursPage() {
                         <td className="p-3 font-bold text-slate-800">{totalHrs.toFixed(1)}h</td>
                         <td className="p-3">
                           <span className="bg-slate-100 text-slate-600 px-2 py-0.5 rounded text-[10px] font-bold border border-slate-200 uppercase">
-                            {e.programme_id === "DC_BAU" ? "Internal" : e.programme_id}
+                            {!e.programme_id || e.programme_id === "DC_BAU" || e.programme_id === "BENCH_TIME" ? "Internal" : e.programme_id}
                           </span>
                         </td>
                         <td className="p-3 font-mono text-dc-blue">{e.wbs}</td>
