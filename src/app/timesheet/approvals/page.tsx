@@ -148,18 +148,18 @@ export default function ApproveTimesheetsPage() {
 
       {/* Approvals Table Card */}
       <div className="bg-white border border-border-base rounded-lg shadow-sm overflow-hidden">
-        <div className="overflow-x-auto">
+        <div className="overflow-auto max-h-[650px]">
           <table className="w-full text-left border-collapse text-xs">
             <thead>
               <tr className="bg-navy text-white font-bold">
-                <th className="p-3">PERSON</th>
-                <th className="p-3">ROLE</th>
-                <th className="p-3">WEEK</th>
-                <th className="p-3 text-center">TOTAL HOURS</th>
-                <th className="p-3 text-center">BILLABLE</th>
-                <th className="p-3 text-center">BAU</th>
-                <th className="p-3">SUBMITTED</th>
-                <th className="p-3 text-center">ACTIONS</th>
+                <th className="p-3 sticky left-0 top-0 bg-navy z-30 border-r border-slate-700">PERSON</th>
+                <th className="p-3 sticky top-0 bg-navy z-20">ROLE</th>
+                <th className="p-3 sticky top-0 bg-navy z-20">WEEK</th>
+                <th className="p-3 text-center sticky top-0 bg-navy z-20">TOTAL HOURS</th>
+                <th className="p-3 text-center sticky top-0 bg-navy z-20">BILLABLE</th>
+                <th className="p-3 text-center sticky top-0 bg-navy z-20">BAU</th>
+                <th className="p-3 sticky top-0 bg-navy z-20">SUBMITTED</th>
+                <th className="p-3 text-center sticky top-0 bg-navy z-20">ACTIONS</th>
               </tr>
             </thead>
             <tbody>
@@ -167,7 +167,7 @@ export default function ApproveTimesheetsPage() {
                 /* Loading skeleton rows */
                 Array.from({ length: 3 }).map((_, i) => (
                   <tr key={i} className="border-b border-slate-100 animate-pulse">
-                    <td className="p-3"><div className="h-3 bg-slate-200 rounded w-28" /></td>
+                    <td className="p-3 sticky left-0 bg-white z-10 border-r border-slate-200"><div className="h-3 bg-slate-200 rounded w-28" /></td>
                     <td className="p-3"><div className="h-3 bg-slate-200 rounded w-20" /></td>
                     <td className="p-3"><div className="h-3 bg-slate-200 rounded w-24" /></td>
                     <td className="p-3 text-center"><div className="h-3 bg-slate-200 rounded w-12 mx-auto" /></td>
@@ -191,8 +191,8 @@ export default function ApproveTimesheetsPage() {
                 </tr>
               ) : (
                 dbPending.map((s, idx) => (
-                  <tr key={s.id || idx} className="border-b border-slate-100 hover:bg-slate-50/50">
-                    <td className="p-3 font-bold text-navy">{s.person_name}</td>
+                  <tr key={s.id || idx} className="group border-b border-slate-100 hover:bg-slate-50/50">
+                    <td className="p-3 font-bold text-navy sticky left-0 bg-white group-hover:bg-slate-50 transition-colors z-10 border-r border-slate-200">{s.person_name}</td>
                     <td className="p-3 text-slate-600 font-medium">{s.person_role}</td>
                     <td className="p-3 font-mono text-dc-blue font-semibold">{s.week_start_date}</td>
                     <td className="p-3 text-center font-bold text-slate-800">{Number(s.total_hours).toFixed(1)}h</td>

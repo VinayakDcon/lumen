@@ -436,28 +436,27 @@ DContour Litetech Pvt. Ltd.`;
           </div>
         </div>
 
-        {/* Right Column (Span 2): Mini Timeline / Gantt progress */}
-        <div className="bg-white border border-slate-150 rounded-lg p-5 shadow-sm lg:col-span-2 space-y-4">
+            <div className="bg-white border border-slate-150 rounded-lg p-5 shadow-sm lg:col-span-2 space-y-4">
           <div className="flex items-center justify-between border-b pb-2">
             <h3 className="text-sm font-bold text-navy">Mini Timeline (Phase Progress)</h3>
             <span className="text-xs text-slate-400">Fixed Today position: Wk {todayWk} of {totalWeeks}</span>
           </div>
-
+ 
           {/* SVG Proportional Mini Gantt */}
           <div className="overflow-x-auto">
-            <svg viewBox="0 0 800 240" className="w-full min-w-[600px] h-auto border border-slate-100 dark:border-slate-800 rounded-lg bg-slate-50/40 dark:bg-slate-950/40">
+            <svg viewBox="0 0 900 240" className="w-full min-w-[750px] h-auto bg-transparent">
               {/* Background week grids */}
               {Array.from({ length: 9 }).map((_, idx) => {
                 const wk = Math.round((idx / 8) * totalWeeks);
                 const x = 50 + (wk / totalWeeks) * 700;
                 return (
                   <g key={idx}>
-                    <line x1={x} y1={25} x2={x} y2={210} className="stroke-slate-200 dark:stroke-slate-800" strokeWidth={1} strokeDasharray="3,3" />
-                    <text x={x} y={20} fontSize={9} className="fill-slate-400 dark:fill-slate-500" textAnchor="middle" fontWeight="bold">Wk {wk}</text>
+                    <line x1={x} y1={25} x2={x} y2={210} stroke="#E2E8F0" strokeWidth={1} strokeDasharray="4,4" className="dark:stroke-slate-800" />
+                    <text x={x} y={18} fontSize={10} style={{ fill: "#475569" }} className="dark:fill-slate-400 font-bold" textAnchor="middle">Wk {wk}</text>
                   </g>
                 );
               })}
-
+ 
               {/* Gantt Phase Bars */}
               {(journey?.phases || [])
                 .filter((ph) => ph.start_wk !== null && ph.end_wk !== null)
@@ -466,32 +465,59 @@ DContour Litetech Pvt. Ltd.`;
                   const startX = 50 + ((ph.start_wk - 1) / totalWeeks) * 700;
                   const endX = 50 + (ph.end_wk / totalWeeks) * 700;
                   const barW = Math.max(8, endX - startX);
-                  const fillW = barW * (ph.avg_pct / 100);
-
+                  
+                  const showBadge = barW >= 45;
+                  const badgeW = showBadge ? 28 : 0;
+                  const trackerX = startX + badgeW;
+                  const trackerW = Math.max(8, barW - badgeW);
+                  const fillW = trackerW * (ph.avg_pct / 100);
+                  const phaseColor = ph.colour || "#0B5BAF";
+ 
                   return (
                     <g key={idx}>
-                      {/* Track rect */}
-                      <rect x={startX} y={barY} width={barW} height={14} rx={3} className="fill-slate-200 dark:fill-slate-800" />
-                      {/* Fill rect */}
-                      <rect x={startX} y={barY} width={fillW} height={14} rx={3} fill={ph.colour || "#0B5BAF"} />
-                      {/* Label inside or next */}
-                      <text x={startX + 6} y={barY + 11} fontSize={8} fill="#FFFFFF" fontWeight="black">{ph.code}</text>
-                      <text x={endX + 6} y={barY + 11} fontSize={9} className="fill-slate-600 dark:fill-slate-300" fontWeight="bold">
-                        {ph.name} ({ph.avg_pct}%)
+                      {/* 1. Code Badge (Solid Color) */}
+                      {showBadge && (
+                        <>
+                          <rect x={startX} y={barY} width={badgeW} height={14} rx={3} fill={phaseColor} />
+                          <text x={startX + badgeW / 2} y={barY + 10} fontSize={8} fill="#FFFFFF" fontWeight="black" textAnchor="middle">{ph.code}</text>
+                        </>
+                      )}
+ 
+                      {/* 2. Track rect (Pastel tint of phase color) */}
+                      <rect 
+                        x={trackerX} 
+                        y={barY} 
+                        width={trackerW} 
+                        height={14} 
+                        rx={3} 
+                        fill={`${phaseColor}15`} 
+                        stroke={`${phaseColor}30`} 
+                        strokeWidth={1}
+                        className="dark:fill-slate-800/40 dark:stroke-slate-700/50" 
+                      />
+                      
+                      {/* 3. Fill rect (Solid progress) */}
+                      {fillW > 0 && (
+                        <rect x={trackerX} y={barY} width={fillW} height={14} rx={3} fill={phaseColor} />
+                      )}
+ 
+                      {/* 4. Text Label (Vibrant slate/navy, clean contrast) */}
+                      <text x={endX + 8} y={barY + 11} fontSize={9} style={{ fill: "#0F172A" }} className="dark:fill-slate-300 font-bold">
+                        {showBadge ? `${ph.name} (${ph.avg_pct}%)` : `${ph.code}: ${ph.name} (${ph.avg_pct}%)`}
                       </text>
                     </g>
                   );
                 })}
-
+ 
               {/* Today line */}
               {(() => {
                 if (!programme.kickoff_date || !todayWk) return null;
                 const todayX = 50 + (todayWk / totalWeeks) * 700;
                 return (
                   <g>
-                    <line x1={todayX} y1={22} x2={todayX} y2={215} stroke="#DC2626" strokeWidth={2} strokeDasharray="4,2" />
-                    <circle cx={todayX} cy={22} r={3} fill="#DC2626" />
-                    <rect x={todayX - 25} y={215} width={50} height={16} rx={3} fill="#DC2626" />
+                    <line x1={todayX} y1={22} x2={todayX} y2={215} stroke="#EF4444" strokeWidth={2} strokeDasharray="4,2" />
+                    <circle cx={todayX} cy={22} r={3} fill="#EF4444" />
+                    <rect x={todayX - 25} y={215} width={50} height={16} rx={3} fill="#EF4444" />
                     <text x={todayX} y={226} fontSize={8} fill="#FFFFFF" textAnchor="middle" fontWeight="black">TODAY</text>
                   </g>
                 );

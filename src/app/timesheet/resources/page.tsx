@@ -25,6 +25,7 @@ export default function ResourceHoursPage() {
   const [weeksRange, setWeeksRange] = useState<number>(8);
   const [apiData, setApiData] = useState<any[] | null>(null);
   const [loading, setLoading] = useState(true);
+  const [highlightedPerson, setHighlightedPerson] = useState<string | null>(null);
 
   // Fetch data from backend API with fallback
   const fetchData = async () => {
@@ -147,17 +148,17 @@ export default function ResourceHoursPage() {
 
       {/* Dynamic Pivot Table Grid */}
       <div className="bg-white border border-border-base rounded-lg shadow-sm overflow-hidden">
-        <div className="overflow-x-auto">
+        <div className="overflow-auto max-h-[650px]">
           <table className="w-full text-left border-collapse text-xs">
             <thead>
               <tr className="bg-navy text-white font-bold">
-                <th className="p-3 w-64 shrink-0">RESOURCE</th>
+                <th className="p-3 w-64 shrink-0 sticky left-0 top-0 bg-navy z-30 border-r border-slate-700">RESOURCE</th>
                 {sortedProgs.map((projId) => (
-                  <th key={projId} className="p-3 text-center min-w-[120px]">
+                  <th key={projId} className="p-3 text-center min-w-[120px] sticky top-0 bg-navy z-20">
                     {projId === "DC_BAU" ? "BAU / Admin" : projId}
                   </th>
                 ))}
-                <th className="p-3 text-center min-w-[120px] bg-slate-800">TOTAL HOURS</th>
+                <th className="p-3 text-center min-w-[120px] bg-slate-800 sticky top-0 z-20">TOTAL HOURS</th>
               </tr>
             </thead>
             <tbody>
@@ -170,16 +171,33 @@ export default function ResourceHoursPage() {
               ) : (
                 sortedPeople.map((personName) => {
                   const row = dataMap[personName];
+                  const isHighlighted = highlightedPerson === row.name;
                   return (
-                    <tr key={personName} className="border-b border-slate-100 hover:bg-slate-50/50">
-                      <td className="p-3 font-bold text-navy">{row.name}</td>
+                    <tr 
+                      key={personName} 
+                      onClick={() => setHighlightedPerson(isHighlighted ? null : row.name)}
+                      className={cn(
+                        "group border-b border-slate-100 hover:bg-slate-50/50 cursor-pointer transition-colors",
+                        isHighlighted ? "bg-blue-50/70 hover:bg-blue-50" : ""
+                      )}
+                    >
+                      <td 
+                        className={cn(
+                          "p-3 font-bold text-navy sticky left-0 transition-colors z-10 border-r border-slate-200",
+                          isHighlighted 
+                            ? "bg-blue-100/80 text-dc-blue"
+                            : "bg-white group-hover:bg-slate-50"
+                        )}
+                      >
+                        {row.name}
+                      </td>
                       {sortedProgs.map((projId) => {
                         const hr = row.hours[projId] || 0;
                         return (
                           <td
                             key={projId}
                             className={cn(
-                              "p-3 text-center font-medium",
+                              "p-3 text-center font-medium transition-colors",
                               hr > 0 ? "text-slate-800 font-bold" : "text-slate-300"
                             )}
                           >
@@ -187,7 +205,12 @@ export default function ResourceHoursPage() {
                           </td>
                         );
                       })}
-                      <td className="p-3 text-center font-black text-navy bg-slate-50">
+                      <td 
+                        className={cn(
+                          "p-3 text-center font-black text-navy transition-colors",
+                          isHighlighted ? "bg-blue-100/40" : "bg-slate-50"
+                        )}
+                      >
                         {row.total.toFixed(1)}
                       </td>
                     </tr>

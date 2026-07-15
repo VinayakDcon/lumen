@@ -169,7 +169,12 @@ export function ProgrammeWizard() {
           variants: Array.isArray(prog.variants) ? prog.variants.join(",") : (prog.variants || ""),
           cloned_from: ""
         });
-        setWizSelectedTeam(new Set(prog.team_members || []));
+        const normalizedTeam = (prog.team_members || []).map((m: any) => {
+          if (typeof m === "number") return `person-${m}`;
+          if (typeof m === "string" && !m.startsWith("person-") && !isNaN(Number(m))) return `person-${m}`;
+          return String(m);
+        });
+        setWizSelectedTeam(new Set(normalizedTeam));
         setWizTemplate(prog.template_id || "BLANK");
         setWizStep(1);
 
@@ -821,7 +826,7 @@ export function ProgrammeWizard() {
                         <td className="p-2">
                           <input 
                             type="text" 
-                            value={p.code} 
+                            value={p.code ?? ""} 
                             onChange={(e) => handlePhaseChange(idx, "code", e.target.value)}
                             className="border border-slate-200 rounded px-2 py-1 w-16"
                           />
@@ -829,7 +834,7 @@ export function ProgrammeWizard() {
                         <td className="p-2">
                           <input 
                             type="text" 
-                            value={p.name} 
+                            value={p.name ?? ""} 
                             onChange={(e) => handlePhaseChange(idx, "name", e.target.value)}
                             className="border border-slate-200 rounded px-2 py-1 w-full"
                           />
@@ -837,7 +842,7 @@ export function ProgrammeWizard() {
                         <td className="p-2">
                           <input 
                             type="number" 
-                            value={p.start_wk} 
+                            value={p.start_wk ?? ""} 
                             onChange={(e) => handlePhaseChange(idx, "start_wk", parseInt(e.target.value) || 1)}
                             className="border border-slate-200 rounded px-2 py-1 w-16"
                           />
@@ -845,7 +850,7 @@ export function ProgrammeWizard() {
                         <td className="p-2">
                           <input 
                             type="number" 
-                            value={p.end_wk} 
+                            value={p.end_wk ?? ""} 
                             onChange={(e) => handlePhaseChange(idx, "end_wk", parseInt(e.target.value) || 1)}
                             className="border border-slate-200 rounded px-2 py-1 w-16"
                           />
@@ -853,7 +858,7 @@ export function ProgrammeWizard() {
                         <td className="p-2 text-center">
                           <input 
                             type="color" 
-                            value={p.colour} 
+                            value={p.colour ?? "#0B5BAF"} 
                             onChange={(e) => handlePhaseChange(idx, "colour", e.target.value)}
                             className="w-8 h-6 border border-slate-200 rounded cursor-pointer"
                           />
@@ -891,7 +896,7 @@ export function ProgrammeWizard() {
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-[50vh] overflow-y-auto pr-2">
                 {people.filter(p => p.active !== 0).map(p => {
-                  const isChecked = wizSelectedTeam.has(p.id);
+                  const isChecked = wizSelectedTeam.has(`person-${p.id}`) || wizSelectedTeam.has(p.id) || wizSelectedTeam.has(String(p.id));
                   return (
                     <label 
                       key={p.id}
@@ -903,7 +908,7 @@ export function ProgrammeWizard() {
                       <input 
                         type="checkbox" 
                         checked={isChecked}
-                        onChange={() => toggleTeamMember(p.id)}
+                        onChange={() => toggleTeamMember(`person-${p.id}`)}
                         className="w-4 h-4 rounded text-dc-blue border-slate-300 focus:ring-dc-blue cursor-pointer"
                       />
                       <div 

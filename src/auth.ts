@@ -30,11 +30,23 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       if (process.env.NEXT_PUBLIC_BYPASS_AUTH === "true") {
         return true;
       }
-      const email = user.email || "";
-      if (email.endsWith("@dcontour.tech")) {
-        return true;
+      const email = (user.email || "").toLowerCase().trim();
+      if (!email.endsWith("@dcontour.tech")) {
+        return false;
       }
-      return false;
+
+      try {
+        const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
+        const res = await fetch(`${apiUrl}/api/me?email=${encodeURIComponent(email)}`);
+        if (!res.ok) {
+          console.warn(`[Auth] Sign-in rejected for ${email}: Backend responded with status ${res.status}`);
+          return false;
+        }
+        return true;
+      } catch (err) {
+        console.error("[Auth] Database verification during sign-in failed:", err);
+        return false;
+      }
     },
     async session({ session, token }) {
       // Mock session logic when bypass mode is active

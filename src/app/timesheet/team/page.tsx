@@ -17,6 +17,7 @@ export default function TeamHoursPage() {
   // Filter range selection: 1 (This week), 4 (Last 4 weeks), 8 (Last 8 weeks), 12 (Last 12 weeks)
   const [weeksRange, setWeeksRange] = useState<number>(8);
   const [filterByActive, setFilterByActive] = useState<boolean>(false);
+  const [highlightedPerson, setHighlightedPerson] = useState<string | null>(null);
 
   // Active project helper
   const activeProg = programmes.find(p => p.id === activeProgrammeId);
@@ -33,10 +34,10 @@ export default function TeamHoursPage() {
   const totalHours = filteredEntries.reduce((sum: number, e: any) => sum + (e.hours || 0) + (e.blocked_hours || 0), 0);
   const uniquePeople = Array.from(new Set(filteredEntries.map((e: any) => e.person_id)));
   const uniqueProgrammes = Array.from(new Set(filteredEntries.map((e: any) => e.programme_id))).filter(id => id && id !== "DC_BAU" && id !== "BENCH_TIME");
-  const benchHours = filteredEntries.filter((e: any) => !e.programme_id || e.programme_id === "DC_BAU" || e.programme_id === "BENCH_TIME").reduce((sum: number, e: any) => sum + (e.hours || 0), 0);
+  const benchHours = filteredEntries.filter((e: any) => !e.programme_id || e.programme_id === "DC_BAU" || e.programme_id === "BENCH_TIME").reduce((sum: number, e: any) => sum + (e.hours || 0) + (e.blocked_hours || 0), 0);
   
   const avgHoursPerPersonWeek = uniquePeople.length > 0
-    ? parseFloat((totalHours / (uniquePeople.length * weeksRange)).toFixed(1))
+    ? parseFloat((totalHours / (uniquePeople.length * (weeksRange === -1 ? 1 : weeksRange))).toFixed(1))
     : 0.0;
 
   // Build Pivot data structure
@@ -170,17 +171,17 @@ export default function TeamHoursPage() {
 
       {/* Cross-Programme Pivot Table */}
       <div className="bg-white border border-border-base rounded-lg shadow-sm overflow-hidden">
-        <div className="overflow-x-auto">
+        <div className="overflow-auto max-h-[650px]">
           <table className="w-full text-left border-collapse text-xs">
             <thead>
               <tr className="bg-navy text-white font-bold">
-                <th className="p-3 w-48 shrink-0">PERSON</th>
+                <th className="p-3 w-48 shrink-0 sticky left-0 top-0 bg-navy z-30 border-r border-slate-700">PERSON</th>
                 {projectCols.map(col => {
                   const borderCol = projectColorMap[col] || "#0B5BAF";
                   return (
                     <th 
                       key={col} 
-                      className="p-3 text-center min-w-[120px]"
+                      className="p-3 text-center min-w-[120px] sticky top-0 bg-navy z-20"
                       style={{ borderBottom: `3px solid ${borderCol}` }}
                     >
                       {col}
@@ -188,12 +189,12 @@ export default function TeamHoursPage() {
                   );
                 })}
                 <th 
-                  className="p-3 text-center min-w-[100px] text-white font-bold bg-navy"
+                  className="p-3 text-center min-w-[100px] text-white font-bold bg-navy sticky top-0 z-20"
                   style={{ borderBottom: "3px solid var(--color-warning-amber)" }}
                 >
                   BENCH TIME
                 </th>
-                <th className="p-3 text-center min-w-[100px] bg-slate-800">TOTAL</th>
+                <th className="p-3 text-center min-w-[100px] bg-slate-800 sticky top-0 z-20">TOTAL</th>
               </tr>
             </thead>
             <tbody>
@@ -205,36 +206,62 @@ export default function TeamHoursPage() {
                 </tr>
               ) : (
                 <>
-                  {pivotRows.map(row => (
-                    <tr key={row.name} className="border-b border-slate-100 hover:bg-slate-50/50">
-                      <td className="p-3 font-bold text-navy">{row.name}</td>
-                      {projectCols.map(col => {
-                        const hrs = row.projectHours[col] || 0;
-                        return (
-                          <td 
-                            key={col} 
-                            className={cn(
-                              "p-3 text-center font-medium",
-                              hrs > 0 ? "text-dc-blue bg-blue-50/10 font-bold" : "text-slate-300"
-                            )}
-                          >
-                            {hrs > 0 ? hrs.toFixed(1) : "—"}
-                          </td>
-                        );
-                      })}
-                      <td className={cn(
-                        "p-3 text-center font-medium",
-                        row.bench > 0 ? "text-amber-900 font-bold bg-amber-500/10" : "text-slate-300"
-                      )}>
-                        {row.bench > 0 ? row.bench.toFixed(1) : "—"}
-                      </td>
-                      <td className="p-3 text-center font-black text-navy bg-slate-50">{row.total.toFixed(1)}</td>
-                    </tr>
-                  ))}
+                  {pivotRows.map(row => {
+                    const isHighlighted = highlightedPerson === row.name;
+                    return (
+                      <tr 
+                        key={row.name} 
+                        onClick={() => setHighlightedPerson(isHighlighted ? null : row.name)}
+                        className={cn(
+                          "group border-b border-slate-100 hover:bg-slate-50/50 cursor-pointer transition-colors",
+                          isHighlighted ? "bg-blue-50/70 hover:bg-blue-50" : ""
+                        )}
+                      >
+                        <td 
+                          className={cn(
+                            "p-3 font-bold text-navy sticky left-0 transition-colors z-10 border-r border-slate-200",
+                            isHighlighted 
+                              ? "bg-blue-100/80 text-dc-blue"
+                              : "bg-white group-hover:bg-slate-50"
+                          )}
+                        >
+                          {row.name}
+                        </td>
+                        {projectCols.map(col => {
+                          const hrs = row.projectHours[col] || 0;
+                          return (
+                            <td 
+                              key={col} 
+                              className={cn(
+                                "p-3 text-center font-medium transition-colors",
+                                hrs > 0 ? "text-dc-blue bg-blue-50/10 font-bold" : "text-slate-300"
+                              )}
+                            >
+                              {hrs > 0 ? hrs.toFixed(1) : "—"}
+                            </td>
+                          );
+                        })}
+                        <td className={cn(
+                          "p-3 text-center font-medium transition-colors",
+                          row.bench > 0 ? "text-amber-900 font-bold bg-amber-500/10" : "text-slate-300"
+                        )}>
+                          {row.bench > 0 ? row.bench.toFixed(1) : "—"}
+                        </td>
+                        <td 
+                          className={cn(
+                            "p-3 text-center font-black text-navy transition-colors",
+                            isHighlighted ? "bg-blue-100/40" : "bg-slate-50"
+                          )}
+                        >
+                          {row.total.toFixed(1)}
+                        </td>
+                      </tr>
+                    );
+                  })}
                   
                   {/* Total Row */}
                   <tr className="bg-slate-100 border-t-2 border-slate-300 font-bold">
-                    <td className="p-3 text-navy">Total</td>
+                    <td className="p-3 text-navy sticky left-0 bg-slate-100 z-10 border-r border-slate-200">Total</td>
                     {projectCols.map(col => {
                       const totalVal = colTotals[col] || 0;
                       return (

@@ -2,11 +2,13 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { usePmoStore } from "@/store/use-pmo-store";
-import { useProgrammesQuery, useTimeEntriesQuery } from "@/hooks/use-pmo-queries";
+import { useProgrammesQuery, useTimeEntriesQuery, useTasksQuery } from "@/hooks/use-pmo-queries";
 import {
   Clock, Trash2, ChevronLeft, ChevronRight, CheckSquare,
-  AlertTriangle, AlertCircle, CalendarDays, X, BriefcaseMedical
+  AlertTriangle, AlertCircle, CalendarDays, X, BriefcaseMedical,
+  Pencil
 } from "lucide-react";
 import { cn } from "@/utils/cn";
 import { TimeEntry } from "@/types/pmo";
@@ -187,6 +189,7 @@ function MiniCalendar({
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
 export default function MyTimesheetPage() {
+  const queryClient   = useQueryClient();
   const user          = usePmoStore(s => s.user);
   const { data: programmes = [] } = useProgrammesQuery();
   useTimeEntriesQuery();
@@ -194,8 +197,17 @@ export default function MyTimesheetPage() {
   const timeEntries   = usePmoStore(s => s.timeEntries);
   const submissions   = usePmoStore(s => s.timesheetSubmissions);
   const addTimeEntry  = usePmoStore(s => s.addTimeEntry);
-  const deleteTimeEntry = usePmoStore(s => s.deleteTimeEntry);
+  const storeDeleteTimeEntry = usePmoStore(s => s.deleteTimeEntry);
+  const deleteTimeEntry = async (id: number) => {
+    await storeDeleteTimeEntry(id);
+    queryClient.invalidateQueries({ queryKey: ["timesheetReport"] });
+    queryClient.invalidateQueries({ queryKey: ["hoursAnalytics"] });
+    queryClient.invalidateQueries({ queryKey: ["tasks"] });
+    queryClient.invalidateQueries({ queryKey: ["timeEntries"] });
+  };
   const submitTimesheetWeek = usePmoStore(s => s.submitTimesheetWeek);
+  const updateTimeEntry = usePmoStore(s => s.updateTimeEntry);
+  const [editingEntryId, setEditingEntryId] = useState<number | null>(null);
 
   // Real today
   const todayDate = new Date();
@@ -244,6 +256,10 @@ export default function MyTimesheetPage() {
 
   // ── Quick-add form state ──
   const [selectedProgId,  setSelectedProgId]  = useState<string>("BG_AUTO_26_001");
+
+  // Reactively query WBS tasks for the selected programme
+  useTasksQuery(selectedProgId);
+
   const [selectedTaskWbs, setSelectedTaskWbs] = useState<string>("");
   const [selectedDate,    setSelectedDate]    = useState<string>(todayStr);
   const [workHr,          setWorkHr]          = useState<string>("");
@@ -259,9 +275,15 @@ export default function MyTimesheetPage() {
 
   const activeProg = programmes.find(p => p.id === selectedProgId);
 
-  // Tasks for the selected programme + BAU
+  const editingEntry = editingEntryId !== null ? timeEntries.find(e => e.id === editingEntryId) : null;
+
+  // Tasks for the selected programme + BAU (filtering out level-3 tasks that are DONE unless it's the one we're editing)
   const filteredTasks = [
-    ...tasks.filter(t => t.programme_id === selectedProgId || t.programme_id === "DC_BAU"),
+    ...tasks.filter(t => 
+      (t.programme_id === selectedProgId || t.programme_id === "DC_BAU") &&
+      t.level === 3 &&
+      ((t.status || "").trim().toUpperCase() !== "DONE" || (editingEntry && t.wbs === editingEntry.wbs))
+    ),
     ...(tasks.some(t => t.wbs === "DC_BAU-1.1.1") ? [] : [{
       wbs: "DC_BAU-1.1.1", programme_id: "DC_BAU", name: "Bench Hours",
       discipline: "BAU", level: 3, effort_hr: 0, actual_hr: 0,
@@ -271,25 +293,38 @@ export default function MyTimesheetPage() {
 
   const personId  = user?.person_id || "person-2";
   const submission = submissions.find(
-    s => s.person_id === personId && s.week_start_date === weekStartStr
+    s => (String(s.person_id) === String(personId) || String(s.person_id) === String(personId).replace("person-", "")) && s.week_start_date === weekStartStr
   );
   const isSubmitted = submission?.status === "SUBMITTED" || submission?.status === "APPROVED";
-
-  // Auto-select first task when programme changes
+ 
+  // Auto-select first task when programme changes or filtered tasks load
   useEffect(() => {
-    setSelectedTaskWbs(filteredTasks.length > 0 ? filteredTasks[0].wbs : "");
-  }, [selectedProgId]);
-
+    if (editingEntryId !== null) return; // Do not auto-select/reset while editing
+    if (filteredTasks.length > 0) {
+      const exists = filteredTasks.some(t => t.wbs === selectedTaskWbs);
+      if (!exists) {
+        setSelectedTaskWbs(filteredTasks[0].wbs);
+      }
+    } else {
+      setSelectedTaskWbs("");
+    }
+  }, [selectedProgId, filteredTasks.length, selectedTaskWbs, editingEntryId]);
+ 
   // Week date array (Mon–Sun)
   const weekDates = Array.from({ length: 7 }, (_, i) => {
     const d = new Date(currentWeekMonday);
     d.setDate(currentWeekMonday.getDate() + i);
     return d;
   });
-
+ 
   // Time entries for current week
   const currentWeekEntries = timeEntries.filter(
-    e => e.person_id === personId && e.entry_date >= weekStartStr && e.entry_date < weekEndStr
+    e => {
+      const matchPerson = 
+        String(e.person_id) === String(personId) || 
+        String(e.person_id) === String(personId).replace("person-", "");
+      return matchPerson && e.entry_date >= weekStartStr && e.entry_date < weekEndStr;
+    }
   );
 
   let totalLogged = 0, billableLogged = 0, bauLogged = 0;
@@ -384,7 +419,7 @@ export default function MyTimesheetPage() {
     }
   };
 
-  const handleLogTime = (e: React.FormEvent) => {
+  const handleLogTime = async (e: React.FormEvent) => {
     e.preventDefault();
     if (isSubmitted) { alert("This timesheet has already been submitted and is locked."); return; }
     const matchedTask = filteredTasks.find(t => t.wbs === selectedTaskWbs);
@@ -394,7 +429,7 @@ export default function MyTimesheetPage() {
     if (prodHours <= 0 && blkHours <= 0) { alert("Please log at least some work hours or blocked hours."); return; }
     if (prodHours + blkHours > 24)        { alert("Logged hours cannot exceed 24 hours in a single day."); return; }
 
-    addTimeEntry({
+    const entryData = {
       wbs: selectedTaskWbs, person_id: personId,
       person_name: user?.name || "Vinayak Chouhan",
       hours: prodHours, blocked_hours: blkHours,
@@ -403,7 +438,43 @@ export default function MyTimesheetPage() {
       entry_date: selectedDate, note: note.trim() || undefined,
       programme_id: matchedTask.programme_id,
       task_name: matchedTask.name, discipline: matchedTask.discipline
-    });
+    };
+
+    if (editingEntryId !== null) {
+      await updateTimeEntry(editingEntryId, entryData);
+      setEditingEntryId(null);
+    } else {
+      await addTimeEntry(entryData);
+    }
+
+    queryClient.invalidateQueries({ queryKey: ["timesheetReport"] });
+    queryClient.invalidateQueries({ queryKey: ["hoursAnalytics"] });
+    queryClient.invalidateQueries({ queryKey: ["tasks"] });
+    queryClient.invalidateQueries({ queryKey: ["timeEntries"] });
+    setWorkHr(""); setBlockedHr(""); setBlockerReason("No blocker"); setNote("");
+  };
+
+  const startEditEntry = (e: TimeEntry) => {
+    setEditingEntryId(e.id);
+    if (e.programme_id && e.programme_id !== "DC_BAU") {
+      setSelectedProgId(e.programme_id);
+    }
+    setSelectedTaskWbs(e.wbs);
+    setSelectedDate(e.entry_date);
+    setWorkHr(String(e.hours || ""));
+    setBlockedHr(String(e.blocked_hours || ""));
+    setBlockerReason(e.blocker_reason || "No blocker");
+    setNote(e.note || "");
+    
+    // Scroll form into view
+    const formElement = document.getElementById("time-entry-form-container");
+    if (formElement) {
+      formElement.scrollIntoView({ behavior: "smooth" });
+    }
+  };
+
+  const handleCancelEdit = () => {
+    setEditingEntryId(null);
     setWorkHr(""); setBlockedHr(""); setBlockerReason("No blocker"); setNote("");
   };
 
@@ -830,12 +901,17 @@ export default function MyTimesheetPage() {
       </div>
 
       {/* ── Quick Add Time Entry ── */}
-      <div className={cn(
-        "border border-dashed rounded-lg p-4 shadow-sm relative transition-all duration-300",
-        isSubmitted
-          ? "bg-slate-50/50 border-slate-200 opacity-60 pointer-events-none"
-          : "border-amber-300 bg-amber-50/20"
-      )}>
+      <div 
+        id="time-entry-form-container"
+        className={cn(
+          "border border-dashed rounded-lg p-4 shadow-sm relative transition-all duration-300",
+          isSubmitted
+            ? "bg-slate-50/50 border-slate-200 opacity-60 pointer-events-none"
+            : editingEntryId !== null
+            ? "border-dc-blue bg-blue-50/15"
+            : "border-amber-300 bg-amber-50/20"
+        )}
+      >
         {isSubmitted && (
           <div className="absolute inset-0 bg-slate-900/5 backdrop-blur-[0.5px] rounded-lg z-10 flex items-center justify-center">
             <span className="text-xs bg-slate-900 text-white font-extrabold tracking-wider px-3.5 py-1.5 rounded uppercase flex items-center gap-1 border border-slate-800">
@@ -848,7 +924,9 @@ export default function MyTimesheetPage() {
         <form onSubmit={handleLogTime} className="flex flex-wrap items-center gap-3">
           <div className="flex items-center gap-1.5 shrink-0 text-slate-800 select-none">
             <Clock className="w-4 h-4 text-amber-500" />
-            <span className="text-xs font-extrabold uppercase tracking-wide">Quick Add Time Entry</span>
+            <span className="text-xs font-extrabold uppercase tracking-wide">
+              {editingEntryId !== null ? "Edit Time Entry" : "Quick Add Time Entry"}
+            </span>
           </div>
 
           {/* Task picker */}
@@ -919,12 +997,23 @@ export default function MyTimesheetPage() {
             />
           </div>
 
-          <button
-            type="submit"
-            className="bg-dc-blue hover:bg-dc-deep text-white px-4 py-1.5 rounded text-xs font-bold cursor-pointer transition-colors shadow-sm"
-          >
-            + Log
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              type="submit"
+              className="bg-dc-blue hover:bg-dc-deep text-white px-4 py-1.5 rounded text-xs font-bold cursor-pointer transition-colors shadow-sm"
+            >
+              {editingEntryId !== null ? "Save Changes" : "+ Log"}
+            </button>
+            {editingEntryId !== null && (
+              <button
+                type="button"
+                onClick={handleCancelEdit}
+                className="border border-slate-200 hover:bg-slate-100 text-slate-500 px-3 py-1.5 rounded text-xs font-bold cursor-pointer transition-colors"
+              >
+                Cancel
+              </button>
+            )}
+          </div>
         </form>
       </div>
 
@@ -1047,15 +1136,24 @@ export default function MyTimesheetPage() {
                         className="bg-slate-50/80 border border-slate-150 rounded p-2.5 relative group hover:border-slate-300 transition-colors"
                       >
                         {!isSubmitted && (
-                          <button
-                            onClick={() => deleteTimeEntry(e.id)}
-                            className="absolute top-1.5 right-1.5 opacity-0 group-hover:opacity-100 text-slate-400 hover:text-danger-red transition-opacity cursor-pointer"
-                            title="Delete entry"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
+                          <div className="absolute top-1.5 right-1.5 flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <button
+                              onClick={() => startEditEntry(e)}
+                              className="text-slate-400 hover:text-dc-blue cursor-pointer"
+                              title="Edit entry"
+                            >
+                              <Pencil className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              onClick={() => deleteTimeEntry(e.id)}
+                              className="text-slate-400 hover:text-danger-red cursor-pointer"
+                              title="Delete entry"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
                         )}
-                        <div className="text-[9px] font-bold text-navy truncate pr-4">
+                        <div className="text-[9px] font-bold text-navy truncate pr-12">
                           {isInternal ? "Internal" : e.programme_id} · {e.wbs}
                         </div>
                         <div className="text-[10px] font-semibold text-slate-700 leading-snug mt-1">

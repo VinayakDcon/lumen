@@ -2,10 +2,13 @@
 
 import React, { Suspense, useState } from "react";
 import { signIn } from "next-auth/react";
-import { Lock, Loader2 } from "lucide-react";
+import { useSearchParams } from "next/navigation";
+import { Lock, Loader2, AlertCircle } from "lucide-react";
 
 function SignInForm() {
   const [isLoading, setIsLoading] = useState(false);
+  const searchParams = useSearchParams();
+  const error = searchParams.get("error");
 
   const handleSignIn = async () => {
     setIsLoading(true);
@@ -62,6 +65,17 @@ function SignInForm() {
               </div>
               <div className="w-16 h-[2px] bg-gradient-to-r from-dc-blue/40 via-gold/50 to-dc-blue/40 mt-1 rounded-full" />
             </div>
+
+            {/* Error Alert Box */}
+            {error && (
+              <div className="mb-6 p-4 bg-red-50/85 border border-red-200/80 text-red-800 text-xs rounded-xl flex items-start gap-2.5 font-medium leading-relaxed shadow-sm">
+                <AlertCircle className="w-4.5 h-4.5 text-red-550 shrink-0 mt-0.5" />
+                <div className="flex flex-col gap-0.5">
+                  <span className="font-bold text-red-900">Access Denied</span>
+                  <span className="text-[11px] text-red-700/90 font-medium">Your email is not registered or active on DconPM. Please contact your system administrator.</span>
+                </div>
+              </div>
+            )}
 
             {/* Prompt Description */}
             <p className="text-slate-500 dark:text-slate-400 text-center mb-8 text-[12px] leading-relaxed max-w-[320px] mx-auto font-medium">

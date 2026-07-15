@@ -670,6 +670,7 @@ interface PmoState {
   carryoverDeliverables: (progId: string, gate: string, sourceProgId: string) => void;
   addTimeEntry: (entry: Omit<TimeEntry, 'id'>) => void;
   deleteTimeEntry: (id: number) => void;
+  updateTimeEntry: (id: number, entry: Partial<TimeEntry>) => Promise<void>;
   setTimeEntries: (entries: TimeEntry[]) => void;
   submitTimesheetWeek: (personId: string, weekStart: string) => Promise<void>;
   approveTimesheetSubmission: (id: number, approvedBy: string) => Promise<void>;
@@ -1785,7 +1786,12 @@ export const usePmoStore = create<PmoState>((set, get) => ({
 
     // For Program Management (MY_22) and other empty ones, return empty by default
     // If the user has logged hours on this program, find those tasks and mark them
-    const progEntries = timeEntries.filter(e => e.programme_id === pid && e.person_id === user?.person_id);
+    const progEntries = timeEntries.filter(e => {
+      const matchPerson = 
+        String(e.person_id) === String(user?.person_id) || 
+        String(e.person_id) === String(user?.person_id).replace("person-", "");
+      return e.programme_id === pid && matchPerson;
+    });
 
     if (progEntries.length === 0) {
       return [];
@@ -1813,7 +1819,15 @@ export const usePmoStore = create<PmoState>((set, get) => ({
 
     const metrics = state.getDashboardMetrics();
     const journey = state.getJourneyData(pid);
-    const team = (prog.team_members || []).map(mid => state.people.find(p => p.id === mid)).filter(Boolean) as Person[];
+    const team = (prog.team_members || [])
+      .map(mid => {
+        const idNum = typeof mid === "string" ? parseInt(mid.replace("person-", ""), 10) : Number(mid);
+        return state.people.find(p => {
+          const pIdNum = typeof p.id === "string" ? parseInt(p.id.replace("person-", ""), 10) : Number(p.id);
+          return pIdNum === idNum || String(p.id) === String(mid);
+        });
+      })
+      .filter(Boolean) as Person[];
 
     const risks = [
       { id: 'RSK-01', area: 'Technical', description: 'Tooling lead time delay for Outer Lens', probability: 'High', impact: 'High', owner: 'Ankit Mishra', status: 'OPEN', mitigation: 'Pre-order steel blocks' },
@@ -2186,6 +2200,23 @@ export const usePmoStore = create<PmoState>((set, get) => ({
       console.error("Failed to delete time entry from backend", e);
     }
   },
+  updateTimeEntry: async (id, entry) => {
+    try {
+      const res = await fetch(`/api-proxy/time/${id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(entry)
+      });
+      if (res.ok) {
+        const updatedEntry = await res.json();
+        set((state) => ({
+          timeEntries: state.timeEntries.map(e => e.id === id ? updatedEntry : e)
+        }));
+      }
+    } catch (e) {
+      console.error("Failed to update time entry on backend", e);
+    }
+  },
   setTimeEntries: (timeEntries) => set({ timeEntries }),
   submitTimesheetWeek: async (personId, weekStart) => {
     try {
@@ -2199,8 +2230,13 @@ export const usePmoStore = create<PmoState>((set, get) => ({
         const sub = await res.json();
         set((state) => ({
           timesheetSubmissions: [
-            ...state.timesheetSubmissions.filter(s => !(s.person_id === personId && s.week_start_date === weekStart)),
-            { ...sub, person_id: personId }
+            ...state.timesheetSubmissions.filter(s => {
+              const matchPerson = 
+                String(s.person_id) === String(personId) || 
+                String(s.person_id) === String(personId).replace("person-", "");
+              return !(matchPerson && s.week_start_date === weekStart);
+            }),
+            { ...sub, person_id: String(personId).startsWith('person-') ? personId : `person-${sub.person_id}` }
           ]
         }));
       }

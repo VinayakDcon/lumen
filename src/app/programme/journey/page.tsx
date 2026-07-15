@@ -102,7 +102,7 @@ export default function ProgrammeJourneyPage() {
         <h3 className="text-sm font-bold text-navy">Journey Roadmap pipeline</h3>
 
         <div className="overflow-x-auto">
-          <svg viewBox={`0 0 ${canvasWidth} 280`} className="w-full min-w-[1000px] h-auto bg-slate-900/5 dark:bg-slate-950/20 border border-slate-100 dark:border-slate-800 rounded-lg p-2 relative">
+          <svg viewBox={`0 0 ${canvasWidth} 280`} className="w-full min-w-[1000px] h-auto bg-transparent">
             {/* Background base path track line */}
             <path className="stroke-slate-250 dark:stroke-slate-700 fill-none" strokeWidth="6" strokeLinecap="round" d={`M${padL},${trackY} L${canvasWidth - padR},${trackY}`} />
             
@@ -112,11 +112,11 @@ export default function ProgrammeJourneyPage() {
             {/* "Where we should be" dashed red line */}
             <line x1={schedX} y1={trackY - 60} x2={schedX} y2={trackY + 60} stroke="#C62828" strokeWidth="1.5" strokeDasharray="5,5" />
             <text x={schedX} y={trackY + 76} className="text-[14px]" textAnchor="middle">📍</text>
-            <text x={schedX} y={trackY + 95} className="fill-red-800 dark:fill-red-400 text-[10px] font-black" textAnchor="middle">SHOULD BE HERE</text>
+            <text x={schedX} y={trackY + 95} style={{ fill: "#B91C1C" }} className="dark:fill-red-400 text-[10px] font-black" textAnchor="middle">SHOULD BE HERE</text>
 
             {/* Today indicator line */}
             <line x1={todayX} y1={trackY - 90} x2={todayX} y2={trackY - 40} stroke="#9CA3AF" strokeWidth="1" />
-            <text x={todayX} y={trackY - 98} className="fill-slate-500 dark:fill-slate-400 text-[9px] font-bold" textAnchor="middle">Today · Wk {todayWk}</text>
+            <text x={todayX} y={trackY - 98} style={{ fill: "#475569" }} className="dark:fill-slate-400 text-[9px] font-bold" textAnchor="middle">Today · Wk {todayWk}</text>
 
             {/* Phase Stations (Nodes) */}
             {(phases || [])
@@ -133,10 +133,10 @@ export default function ProgrammeJourneyPage() {
                     <text x={x} y={trackY + 4} className="fill-white text-[9px] font-black" textAnchor="middle">{ph.code}</text>
                     
                     {/* Name label above */}
-                    <text x={x} y={trackY - 26} className="fill-navy dark:fill-slate-200 text-[10px] font-extrabold" textAnchor="middle">{ph.name}</text>
+                    <text x={x} y={trackY - 26} style={{ fill: "#0D1B2E" }} className="dark:fill-slate-200 text-[10px] font-extrabold" textAnchor="middle">{ph.name}</text>
                     
                     {/* Pct completion below */}
-                    <text x={x} y={trackY - 14} className="fill-slate-400 dark:fill-slate-400 text-[9px] font-bold" textAnchor="middle">{ph.avg_pct}%</text>
+                    <text x={x} y={trackY - 14} style={{ fill: "#475569" }} className="dark:fill-slate-400 text-[9px] font-bold" textAnchor="middle">{ph.avg_pct}%</text>
                   </g>
                 );
               })}

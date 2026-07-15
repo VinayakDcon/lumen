@@ -451,26 +451,26 @@ export default function HoursAnalyticsPage() {
               </p>
             </div>
 
-            <div className="overflow-x-auto">
+            <div className="overflow-auto max-h-[650px]">
               <table className="w-full text-left border-collapse">
                 <thead>
-                  <tr className="bg-slate-50 text-[10px] uppercase font-black text-slate-400 border-b border-border-base">
-                    <th className="py-3 px-5">Employee Name</th>
-                    <th className="py-3 px-5">Department</th>
-                    <th className="py-3 px-5">Resource ID</th>
-                    <th className="py-3 px-5 text-right">Billable (Hrs)</th>
-                    <th className="py-3 px-5 text-right">Non-Billable (Hrs)</th>
-                    <th className="py-3 px-5 text-right">Blocked (Hrs)</th>
-                    <th className="py-3 px-5 text-right">Total (Hrs)</th>
-                    <th className="py-3 px-5 text-center">Status</th>
+                  <tr className="bg-slate-55 text-[10px] uppercase font-black text-slate-400 border-b border-border-base">
+                    <th className="py-3 px-5 sticky left-0 top-0 bg-slate-50 z-30 border-r border-slate-250">Employee Name</th>
+                    <th className="py-3 px-5 sticky top-0 bg-slate-50 z-20">Department</th>
+                    <th className="py-3 px-5 sticky top-0 bg-slate-50 z-20">Resource ID</th>
+                    <th className="py-3 px-5 text-right sticky top-0 bg-slate-50 z-20">Billable (Hrs)</th>
+                    <th className="py-3 px-5 text-right sticky top-0 bg-slate-50 z-20">Non-Billable (Hrs)</th>
+                    <th className="py-3 px-5 text-right sticky top-0 bg-slate-50 z-20">Blocked (Hrs)</th>
+                    <th className="py-3 px-5 text-right sticky top-0 bg-slate-50 z-20">Total (Hrs)</th>
+                    <th className="py-3 px-5 text-center sticky top-0 bg-slate-50 z-20">Status</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 text-xs">
                   {resourceHours.map((r: any) => {
                     const statusInfo = getStatusColor(r.status);
                     return (
-                      <tr key={r.person_id} className="hover:bg-slate-50/50 transition-colors">
-                        <td className="py-3 px-5">
+                      <tr key={r.person_id} className="group hover:bg-slate-50/50 transition-colors">
+                        <td className="py-3 px-5 sticky left-0 bg-white group-hover:bg-slate-50 transition-colors z-10 border-r border-slate-200">
                           <span className="font-bold text-navy block">{r.name}</span>
                           <span className="text-[10px] text-slate-400 block">{r.role}</span>
                         </td>
