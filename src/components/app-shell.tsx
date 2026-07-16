@@ -11,8 +11,10 @@ import { usePathname } from "next/navigation";
 import { canAccessRoute } from "@/lib/roles";
 import { ShieldAlert } from "lucide-react";
 import Link from "next/link";
+import { useSession } from "next-auth/react";
 
 export function AppShell({ children }: { children: React.ReactNode }) {
+  const { status } = useSession();
   const sidebarCollapsed = usePmoStore((state) => state.sidebarCollapsed);
   const user = usePmoStore((state) => state.user);
   const pathname = usePathname();
@@ -25,6 +27,20 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         {children}
       </div>
     );
+  }
+
+  // Handle loading state to prevent flash of mock/previous dashboard data
+  if (status === "loading") {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-bg-base">
+        <div className="w-8 h-8 border-4 border-dc-blue border-t-transparent rounded-full animate-spin"></div>
+      </div>
+    );
+  }
+
+  // Block rendering dashboard layout if unauthenticated
+  if (status === "unauthenticated" && process.env.NEXT_PUBLIC_BYPASS_AUTH !== "true") {
+    return null;
   }
 
   const isAllowed = !user || canAccessRoute(user.role, pathname);
