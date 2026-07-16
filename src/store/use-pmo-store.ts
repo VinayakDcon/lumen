@@ -6,7 +6,7 @@ const mockUser: User = {
   id: 'usr-1',
   username: 'vinayak.chouhan',
   name: 'Vinayak Chouhan',
-  email: 'vinayak.chouhan@dcontour.com',
+  email: 'vinayak.chouhan@dcontour.tech',
   role: 'SOFTWARE_LEAD',
   active: true,
   avatar_color: '#1E90E8',
@@ -642,7 +642,7 @@ interface PmoState {
   setAssignedProgrammeIds: (ids: string[] | null) => void;
   setProgrammes: (progs: Programme[]) => void;
   setPeople: (people: Person[]) => void;
-  loadPeople: () => Promise<void>;
+  loadPeople: (force?: boolean) => Promise<void>;
   addProgramme: (prog: Programme) => void;
   updateProgramme: (id: string, updates: Partial<Programme>) => void;
   switchProgramme: (id: string) => void;
@@ -1257,7 +1257,7 @@ const initialLabBookings: LabBooking[] = [
 
 const initialUsers: User[] = [
   mockUser,
-  { id: 'usr-2', username: 'admin', name: 'Admin User', email: 'admin@dcontour.com', role: 'ADMIN', active: true, avatar_color: '#34d399' }
+  { id: 'usr-2', username: 'admin', name: 'Admin User', email: 'admin@dcontour.tech', role: 'ADMIN', active: true, avatar_color: '#34d399' }
 ];
 
 const initialSkills: Skill[] = [
@@ -1283,8 +1283,8 @@ export const usePmoStore = create<PmoState>((set, get) => ({
   programmeWizardEditId: null,
 
   // Load people from backend API
-  loadPeople: async () => {
-    if (get().peopleLoaded) return;
+  loadPeople: async (force = false) => {
+    if (get().peopleLoaded && !force) return;
     try {
       const res = await fetch('/api-proxy/people');
       if (!res.ok) {
@@ -1584,7 +1584,12 @@ export const usePmoStore = create<PmoState>((set, get) => ({
   updateProgramme: (id, updates) => set((state) => ({
     programmes: state.programmes.map(p => p.id === id ? { ...p, ...updates } : p)
   })),
-  switchProgramme: (activeProgrammeId) => set({ activeProgrammeId }),
+  switchProgramme: (activeProgrammeId) => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('pmo_active_programme_id', activeProgrammeId);
+    }
+    set({ activeProgrammeId });
+  },
   openProgrammeWizard: (mode, editId = null) => set({
     isProgrammeWizardOpen: true,
     programmeWizardMode: mode,
@@ -2302,6 +2307,10 @@ export const usePmoStore = create<PmoState>((set, get) => ({
       });
       if (res.ok) {
         const newTask = await res.json();
+        const normalized = {
+          ...newTask,
+          blocked_hr: newTask.blocked_hr !== undefined ? newTask.blocked_hr : (newTask.blocked_hours || 0)
+        };
         set((state) => {
           const newLog = {
             id: (state.auditLogs?.length || 0) + 1,
@@ -2314,7 +2323,7 @@ export const usePmoStore = create<PmoState>((set, get) => ({
             new_value: task.name
           };
           return {
-            tasks: [...state.tasks.filter(t => t.wbs !== task.wbs), newTask],
+            tasks: [...state.tasks.filter(t => t.wbs !== task.wbs), normalized],
             auditLogs: [newLog, ...(state.auditLogs || [])]
           };
         });
@@ -2332,6 +2341,10 @@ export const usePmoStore = create<PmoState>((set, get) => ({
       });
       if (res.ok) {
         const updatedTask = await res.json();
+        const normalized = {
+          ...updatedTask,
+          blocked_hr: updatedTask.blocked_hr !== undefined ? updatedTask.blocked_hr : (updatedTask.blocked_hours || 0)
+        };
         set((state) => {
           const oldTask = state.tasks.find(t => t.wbs === wbs);
           const newLogs: any[] = [];
@@ -2354,7 +2367,7 @@ export const usePmoStore = create<PmoState>((set, get) => ({
             });
           }
           return {
-            tasks: state.tasks.map(t => t.wbs === wbs ? { ...t, ...updatedTask } : t),
+            tasks: state.tasks.map(t => t.wbs === wbs ? { ...t, ...normalized } : t),
             auditLogs: [...newLogs, ...(state.auditLogs || [])]
           };
         });

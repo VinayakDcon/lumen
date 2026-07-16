@@ -53,7 +53,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       if (!hasCredentials || process.env.NEXT_PUBLIC_BYPASS_AUTH === "true") {
         session.user = {
           name: "Vinayak Chouhan",
-          email: "vinayak.chouhan@dcontour.com",
+          email: "vinayak.chouhan@dcontour.tech",
           image: "https://avatar.vercel.sh/vinayak",
           id: "usr-1",
           emailVerified: null,

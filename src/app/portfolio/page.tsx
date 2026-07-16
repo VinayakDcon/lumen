@@ -169,12 +169,16 @@ export default function PortfolioPage() {
   const handleDeleteProgramme = (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
     if (confirm(`Are you sure you want to delete programme "${id}"?`)) {
-      fetch(`/api-proxy/programmes/${id}`, { method: "DELETE" }).then(() => {
-        alert(`Deleted programme ${id}`);
-        window.location.reload();
-      }).catch(() => {
-        alert(`Deleted programme ${id} (Mock Action)`);
-      });
+      fetch(`/api-proxy/programmes/${id}`, { method: "DELETE" })
+        .then((res) => {
+          if (!res.ok) throw new Error("Failed to delete");
+          alert(`Deleted programme ${id}`);
+          window.location.reload();
+        })
+        .catch((err) => {
+          console.error(err);
+          alert(`Failed to delete programme ${id}`);
+        });
     }
   };
 

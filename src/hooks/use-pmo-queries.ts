@@ -124,8 +124,12 @@ export function useTasksQuery(id: string) {
       const res = await fetch(`/api-proxy/tasks/programme/${id}`);
       if (!res.ok) throw new Error("Failed to fetch tasks");
       const data = await res.json();
-      setTasks(data, id);
-      return data;
+      const normalized = data.map((t: any) => ({
+        ...t,
+        blocked_hr: t.blocked_hr !== undefined ? t.blocked_hr : (t.blocked_hours || 0)
+      }));
+      setTasks(normalized, id);
+      return normalized;
     },
     enabled: !!id,
   });
@@ -141,7 +145,11 @@ export function useEvmReportQuery(id: string, week?: number) {
       const res = await fetch(`/api-proxy/tasks/programme/${id}`);
       if (!res.ok) throw new Error("Failed to fetch tasks");
       const data = await res.json();
-      setTasks(data, id);
+      const normalized = data.map((t: any) => ({
+        ...t,
+        blocked_hr: t.blocked_hr !== undefined ? t.blocked_hr : (t.blocked_hours || 0)
+      }));
+      setTasks(normalized, id);
       return getEvmReport(id, week);
     },
     enabled: !!id,
@@ -158,7 +166,11 @@ export function useHeatmapReportQuery(id: string) {
       const res = await fetch(`/api-proxy/tasks/programme/${id}`);
       if (!res.ok) throw new Error("Failed to fetch tasks");
       const data = await res.json();
-      setTasks(data, id);
+      const normalized = data.map((t: any) => ({
+        ...t,
+        blocked_hr: t.blocked_hr !== undefined ? t.blocked_hr : (t.blocked_hours || 0)
+      }));
+      setTasks(normalized, id);
       return getHeatmapReport(id);
     },
     enabled: !!id,
@@ -437,7 +449,10 @@ export function useCreatePersonMutation() {
       if (!res.ok) throw new Error("Failed to create person");
       return res.json() as Promise<Person>;
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["people"] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["people"] });
+      usePmoStore.getState().loadPeople(true);
+    },
   });
 }
 
@@ -453,7 +468,27 @@ export function useUpdatePersonMutation() {
       if (!res.ok) throw new Error("Failed to update person");
       return res.json() as Promise<Person>;
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["people"] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["people"] });
+      usePmoStore.getState().loadPeople(true);
+    },
+  });
+}
+
+export function useDeletePersonMutation() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: number | string) => {
+      const res = await fetch(`/api-proxy/people/${id}`, {
+        method: "DELETE",
+      });
+      if (!res.ok) throw new Error("Failed to delete person");
+      return res.json();
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["people"] });
+      usePmoStore.getState().loadPeople(true);
+    },
   });
 }
 
@@ -572,12 +607,16 @@ export function useTimeEntriesQuery() {
 }
 
 export function useTimesheetReportQuery(weeks: number, pid?: string) {
+  const email = usePmoStore((state) => state.user?.email);
   return useQuery<any>({
-    queryKey: ["timesheetReport", weeks, pid],
+    queryKey: ["timesheetReport", weeks, pid, email],
     queryFn: async () => {
       let url = `/api-proxy/reports/timesheet?weeks=${weeks}`;
       if (pid) {
         url += `&programme_id=${encodeURIComponent(pid)}`;
+      }
+      if (email) {
+        url += `&email=${encodeURIComponent(email)}`;
       }
       const res = await fetch(url);
       if (!res.ok) throw new Error("Failed to fetch timesheet report");

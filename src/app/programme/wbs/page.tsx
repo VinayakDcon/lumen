@@ -58,7 +58,7 @@ export default function WbsPage() {
   
   // Role checks
   const isEditor = useMemo(() => {
-    return user?.role && ["PMO", "ADMIN", "PROJECT_MANAGER", "PM"].includes(user.role);
+    return user?.role && user.role !== "CUSTOMER";
   }, [user]);
 
   // Fetch unique values for dropdown filters
@@ -354,12 +354,20 @@ export default function WbsPage() {
     e.preventDefault();
     if (!formWbs || !formName) return;
 
-    // Detect level from dots
-    const dots = (formWbs.match(/\./g) || []).length;
+    // Ensure WBS starts with the active programme ID prefix
+    let finalWbs = formWbs.trim();
+    const prefix = `${activeProgrammeId}-`.toLowerCase();
+    if (!finalWbs.toLowerCase().startsWith(prefix)) {
+      finalWbs = `${activeProgrammeId}-${finalWbs}`;
+    }
+
+    // Detect level from dots on the suffix WBS hierarchy part
+    const suffixPart = finalWbs.substring(activeProgrammeId.length + 1);
+    const dots = (suffixPart.match(/\./g) || []).length;
     const computedLevel = dots === 0 ? 1 : (dots === 1 ? 2 : 3);
 
     const taskPayload: Task = {
-      wbs: formWbs,
+      wbs: finalWbs,
       programme_id: activeProgrammeId,
       name: formName,
       phase: formPhase,
@@ -376,7 +384,7 @@ export default function WbsPage() {
       percent_complete: formPercent,
       approval_status: formApproval === "—" ? "NOT_REQUIRED" : formApproval,
       level: computedLevel,
-      wbs_sort: formWbs,
+      wbs_sort: finalWbs,
       start_wk: formStartWk,
       finish_wk: formFinishWk,
       cost_inr: formPlanHr * 1500

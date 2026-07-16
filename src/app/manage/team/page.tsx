@@ -1,12 +1,12 @@
 "use client";
 
 import React, { useState, useMemo } from "react";
-import { usePeopleQuery, useCreatePersonMutation, useUpdatePersonMutation } from "@/hooks/use-pmo-queries";
+import { usePeopleQuery, useCreatePersonMutation, useUpdatePersonMutation, useDeletePersonMutation } from "@/hooks/use-pmo-queries";
 import { useRole } from "@/hooks/use-role";
 import { ReadOnlyBanner } from "@/components/ui/read-only-banner";
 import { ProtectedAction } from "@/components/ui/protected-action";
 import { 
-  Users, Search, Plus, Edit3, X, User as UserIcon
+  Users, Search, Plus, Edit3, X, User as UserIcon, Trash2
 } from "lucide-react";
 import { Person } from "@/types/pmo";
 
@@ -16,6 +16,7 @@ export default function TeamPage() {
   const { data: people = [], isLoading } = usePeopleQuery();
   const createMutation = useCreatePersonMutation();
   const updateMutation = useUpdatePersonMutation();
+  const deleteMutation = useDeletePersonMutation();
 
   // Filter states
   const [searchQuery, setSearchQuery] = useState("");
@@ -113,6 +114,16 @@ export default function TeamPage() {
     }
   };
 
+  const handleDeletePerson = async (id: number | string, name: string) => {
+    if (confirm(`Are you sure you want to delete "${name}"? This will permanently remove them and their user account from the backend and DB.`)) {
+      try {
+        await deleteMutation.mutateAsync(id);
+      } catch (err) {
+        console.error("Failed to delete person:", err);
+      }
+    }
+  };
+
   const getInitials = (name: string) => {
     return name
       .split(' ')
@@ -192,13 +203,22 @@ export default function TeamPage() {
           {filteredPeople.map((person) => (
             <div key={person.id} className="clay-card p-5 flex flex-col group relative">
               <ProtectedAction allowed={canManageTeam}>
-                <button 
-                  onClick={() => handleOpenModal(person)}
-                  className="absolute top-3 right-3 p-1.5 text-slate-300 opacity-0 group-hover:opacity-100 group-hover:text-dc-blue hover:bg-blue-50 rounded transition-all"
-                  title="Edit Person"
-                >
-                  <Edit3 className="w-4 h-4" />
-                </button>
+                <div className="absolute top-3 right-3 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <button 
+                    onClick={() => handleOpenModal(person)}
+                    className="p-1.5 text-slate-400 hover:text-dc-blue hover:bg-blue-50 rounded transition-all"
+                    title="Edit Person"
+                  >
+                    <Edit3 className="w-4 h-4" />
+                  </button>
+                  <button 
+                    onClick={() => handleDeletePerson(person.id, person.name)}
+                    className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded transition-all"
+                    title="Delete Person"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </div>
               </ProtectedAction>
               
               <div className="flex items-start gap-3 mb-4">

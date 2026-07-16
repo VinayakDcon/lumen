@@ -27,7 +27,15 @@ export interface MeResponse {
 export default function SessionSync() {
   const { data: session, status } = useSession();
   const router = useRouter();
-
+  // Load saved active programme from local storage on mount
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('pmo_active_programme_id');
+      if (saved) {
+        usePmoStore.getState().switchProgramme(saved);
+      }
+    }
+  }, []);
   useEffect(() => {
     if (status !== "authenticated" && status !== "unauthenticated") return;
 

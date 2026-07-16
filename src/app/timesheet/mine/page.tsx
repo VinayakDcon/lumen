@@ -255,7 +255,17 @@ export default function MyTimesheetPage() {
   }, []);
 
   // ── Quick-add form state ──
-  const [selectedProgId,  setSelectedProgId]  = useState<string>("BG_AUTO_26_001");
+  const [selectedProgId,  setSelectedProgId]  = useState<string>("");
+
+  // Sync selectedProgId with first available programme when programmes load
+  useEffect(() => {
+    if (programmes.length > 0) {
+      const exists = programmes.some(p => p.id === selectedProgId);
+      if (!exists) {
+        setSelectedProgId(programmes[0].id);
+      }
+    }
+  }, [programmes, selectedProgId]);
 
   // Reactively query WBS tasks for the selected programme
   useTasksQuery(selectedProgId);
