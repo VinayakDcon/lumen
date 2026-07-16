@@ -705,6 +705,17 @@ export default function GanttPage() {
     win.document.close();
   };
 
+  if (!activeProgrammeId) {
+    return (
+      <div className="page-container flex flex-col items-center justify-center min-h-[50vh] text-center p-6 bg-white rounded-lg border border-slate-200">
+        <h2 className="text-base font-bold text-slate-700 mb-2 font-sans">No Project Selected</h2>
+        <p className="text-slate-500 text-xs max-w-md font-sans font-medium">
+          You are not currently assigned to any active projects, or no project has been selected. Please select a project from the sidebar or contact your administrator.
+        </p>
+      </div>
+    );
+  }
+
   if (isProgLoading || isTasksLoading) {
     return (
       <div className="w-full h-[calc(100vh-64px)] flex items-center justify-center bg-bg-base">

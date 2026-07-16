@@ -96,9 +96,14 @@ export default function SessionSync() {
         // null = full access, [] = no access, [...] = specific programmes
         store.setAssignedProgrammeIds(me.assigned_programme_ids);
 
-        if (me.assigned_programme_ids && me.assigned_programme_ids.length > 0) {
-          if (!me.assigned_programme_ids.includes(store.activeProgrammeId)) {
-            store.switchProgramme(me.assigned_programme_ids[0]);
+        if (me.assigned_programme_ids) {
+          if (me.assigned_programme_ids.length > 0) {
+            if (!me.assigned_programme_ids.includes(store.activeProgrammeId)) {
+              store.switchProgramme(me.assigned_programme_ids[0]);
+            }
+          } else {
+            // No projects assigned - clear active programme
+            store.switchProgramme("");
           }
         }
 
