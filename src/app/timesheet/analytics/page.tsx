@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useHoursAnalyticsQuery } from "@/hooks/use-pmo-queries";
 import { 
   LineChart, Calendar, Users, Hourglass, TrendingUp, TrendingDown,
@@ -442,65 +442,384 @@ export default function HoursAnalyticsPage() {
             </div>
           </div>
 
-          {/* Detailed Data Table */}
-          <div className="bg-white border border-border-base rounded-xl shadow-sm overflow-hidden">
-            <div className="p-5 border-b border-border-base">
-              <h3 className="text-sm font-black text-navy">Employee Weekly Timesheet Summary</h3>
-              <p className="text-xs text-slate-400 mt-0.5">
-                Detailed breakdowns of logged hours, billable vs non-billable categorization, and status.
-              </p>
-            </div>
-
-            <div className="overflow-auto max-h-[650px]">
-              <table className="w-full text-left border-collapse">
-                <thead>
-                  <tr className="bg-slate-55 text-[10px] uppercase font-black text-slate-400 border-b border-border-base">
-                    <th className="py-3 px-5 sticky left-0 top-0 bg-slate-50 z-30 border-r border-slate-250">Employee Name</th>
-                    <th className="py-3 px-5 sticky top-0 bg-slate-50 z-20">Department</th>
-                    <th className="py-3 px-5 sticky top-0 bg-slate-50 z-20">Resource ID</th>
-                    <th className="py-3 px-5 text-right sticky top-0 bg-slate-50 z-20">Billable (Hrs)</th>
-                    <th className="py-3 px-5 text-right sticky top-0 bg-slate-50 z-20">Non-Billable (Hrs)</th>
-                    <th className="py-3 px-5 text-right sticky top-0 bg-slate-50 z-20">Blocked (Hrs)</th>
-                    <th className="py-3 px-5 text-right sticky top-0 bg-slate-50 z-20">Total (Hrs)</th>
-                    <th className="py-3 px-5 text-center sticky top-0 bg-slate-50 z-20">Status</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100 text-xs">
-                  {resourceHours.map((r: any) => {
-                    const statusInfo = getStatusColor(r.status);
-                    return (
-                      <tr key={r.person_id} className="group hover:bg-slate-50/50 transition-colors">
-                        <td className="py-3 px-5 sticky left-0 bg-white group-hover:bg-slate-50 transition-colors z-10 border-r border-slate-200">
-                          <span className="font-bold text-navy block">{r.name}</span>
-                          <span className="text-[10px] text-slate-400 block">{r.role}</span>
-                        </td>
-                        <td className="py-3 px-5 text-slate-500 font-medium">{r.department}</td>
-                        <td className="py-3 px-5 text-slate-500 font-mono font-semibold">{r.resource_id}</td>
-                        <td className="py-3 px-5 text-right text-emerald-600 font-bold">{r.billable}</td>
-                        <td className="py-3 px-5 text-right text-slate-500 font-semibold">{r.non_billable}</td>
-                        <td className="py-3 px-5 text-right text-rose-500 font-semibold">{r.blocked}</td>
-                        <td className="py-3 px-5 text-right text-navy font-bold">{r.total}</td>
-                        <td className="py-3 px-5 text-center">
-                          <span className={`inline-flex px-2 py-0.5 rounded-full text-[10px] font-black border uppercase tracking-wider ${statusInfo.text}`}>
-                            {r.total >= 45 ? "Target Met" : r.total >= 10 ? "Active" : "Under Limit"}
-                          </span>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                  {resourceHours.length === 0 && (
-                    <tr>
-                      <td colSpan={8} className="py-8 text-center text-slate-400 font-semibold">
-                        No resource hours logged for this week.
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </div>
+          {/* Interactive Hours Workflow Flowchart */}
+          <NodeConnectionFlow weekEntries={data?.week_entries || []} />
         </>
       )}
+    </div>
+  );
+}
+
+function NodeConnectionFlow({ weekEntries }: { weekEntries: any[] }) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
+  const [selectedEmployeeId, setSelectedEmployeeId] = useState<string | null>(null);
+  const [connections, setConnections] = useState<Array<{ d: string; color: string; strokeWidth: number }>>([]);
+
+  // Process entries into hierarchy
+  const projectsMap: Record<string, any> = {};
+
+  weekEntries.forEach((e: any) => {
+    const progId = e.programme_id || 'BENCH_TIME';
+    const progName = e.programme_name || (progId === 'BENCH_TIME' ? 'Bench / BAU' : progId);
+    const isBillable = progId !== 'BENCH_TIME' && progId !== 'DC_BAU';
+
+    if (!projectsMap[progId]) {
+      projectsMap[progId] = {
+        id: progId,
+        name: progName,
+        totalHours: 0,
+        benchHours: 0,
+        employees: {}
+      };
+    }
+
+    const hrs = e.hours || 0;
+    const blk = e.blocked_hours || 0;
+    const logHrs = hrs + blk;
+
+    projectsMap[progId].totalHours += logHrs;
+    if (!isBillable) {
+      projectsMap[progId].benchHours += logHrs;
+    }
+
+    const rawPersonId = e.person_id || 'unknown';
+    const personId = String(rawPersonId).replace('person-', '');
+    if (!projectsMap[progId].employees[personId]) {
+      projectsMap[progId].employees[personId] = {
+        personId,
+        name: e.person_name || 'Unknown',
+        role: e.person_role || 'Engineer',
+        department: e.department || 'Other',
+        resourceId: e.resource_id || 'N/A',
+        totalHours: 0,
+        tasks: []
+      };
+    }
+
+    projectsMap[progId].employees[personId].totalHours += logHrs;
+    projectsMap[progId].employees[personId].tasks.push({
+      wbs: e.wbs || '',
+      name: e.task_name || e.wbs || 'General Task',
+      hours: logHrs,
+      notes: e.note || e.blocker_note || ''
+    });
+  });
+
+  const projects = Object.values(projectsMap).map((p: any) => {
+    p.totalHours = Math.round(p.totalHours * 10) / 10;
+    p.benchHours = Math.round(p.benchHours * 10) / 10;
+    p.employees = Object.values(p.employees).map((emp: any) => {
+      emp.totalHours = Math.round(emp.totalHours * 10) / 10;
+      emp.tasks = emp.tasks.map((t: any) => {
+        t.hours = Math.round(t.hours * 10) / 10;
+        return t;
+      }).sort((a: any, b: any) => b.hours - a.hours);
+      return emp;
+    }).sort((a: any, b: any) => b.totalHours - a.totalHours);
+    return p;
+  }).sort((a: any, b: any) => b.totalHours - a.totalHours);
+
+  // Auto-select first project if none selected and projects exist
+  useEffect(() => {
+    if (projects.length > 0 && !selectedProjectId) {
+      setSelectedProjectId(projects[0].id);
+    }
+  }, [projects, selectedProjectId]);
+
+  // Reset employee when project changes
+  const handleProjectSelect = (id: string) => {
+    if (selectedProjectId === id) {
+      setSelectedProjectId(null);
+      setSelectedEmployeeId(null);
+    } else {
+      setSelectedProjectId(id);
+      setSelectedEmployeeId(null);
+    }
+  };
+
+  const handleEmployeeSelect = (id: string) => {
+    if (selectedEmployeeId === id) {
+      setSelectedEmployeeId(null);
+    } else {
+      setSelectedEmployeeId(id);
+    }
+  };
+
+  const recalculateLines = () => {
+    const container = containerRef.current;
+    if (!container) return;
+
+    const newConnections: Array<{ d: string; color: string; strokeWidth: number }> = [];
+    const containerRect = container.getBoundingClientRect();
+
+    if (selectedProjectId) {
+      const outPort = document.getElementById(`port-out-proj-${selectedProjectId}`);
+      if (outPort) {
+        const outRect = outPort.getBoundingClientRect();
+        const startX = outRect.left - containerRect.left + outRect.width / 2;
+        const startY = outRect.top - containerRect.top + outRect.height / 2;
+
+        const currentProj = projects.find(p => p.id === selectedProjectId);
+        if (currentProj) {
+          currentProj.employees.forEach((emp: any) => {
+            const inPort = document.getElementById(`port-in-emp-${selectedProjectId}-${emp.personId}`);
+            if (inPort) {
+              const inRect = inPort.getBoundingClientRect();
+              const endX = inRect.left - containerRect.left + inRect.width / 2;
+              const endY = inRect.top - containerRect.top + inRect.height / 2;
+
+              const cpX1 = startX + (endX - startX) * 0.4;
+              const cpY1 = startY;
+              const cpX2 = startX + (endX - startX) * 0.6;
+              const cpY2 = endY;
+
+              const isActive = selectedEmployeeId === emp.personId;
+              const color = isActive ? '#3B82F6' : '#94A3B8';
+              const strokeWidth = isActive ? 3 : 1.5;
+              const d = `M ${startX} ${startY} C ${cpX1} ${cpY1}, ${cpX2} ${cpY2}, ${endX} ${endY}`;
+              newConnections.push({ d, color, strokeWidth });
+            }
+          });
+        }
+      }
+    }
+
+    if (selectedProjectId && selectedEmployeeId) {
+      const outPort = document.getElementById(`port-out-emp-${selectedProjectId}-${selectedEmployeeId}`);
+      if (outPort) {
+        const outRect = outPort.getBoundingClientRect();
+        const startX = outRect.left - containerRect.left + outRect.width / 2;
+        const startY = outRect.top - containerRect.top + outRect.height / 2;
+
+        const currentProj = projects.find(p => p.id === selectedProjectId);
+        if (currentProj) {
+          const currentEmp = currentProj.employees.find((emp: any) => emp.personId === selectedEmployeeId);
+          if (currentEmp) {
+            currentEmp.tasks.forEach((task: any, idx: number) => {
+              const inPort = document.getElementById(`port-in-task-${idx}`);
+              if (inPort) {
+                const inRect = inPort.getBoundingClientRect();
+                const endX = inRect.left - containerRect.left + inRect.width / 2;
+                const endY = inRect.top - containerRect.top + inRect.height / 2;
+
+                const cpX1 = startX + (endX - startX) * 0.4;
+                const cpY1 = startY;
+                const cpX2 = startX + (endX - startX) * 0.6;
+                const cpY2 = endY;
+
+                const color = '#8B5CF6';
+                const strokeWidth = 2;
+                const d = `M ${startX} ${startY} C ${cpX1} ${cpY1}, ${cpX2} ${cpY2}, ${endX} ${endY}`;
+                newConnections.push({ d, color, strokeWidth });
+              }
+            });
+          }
+        }
+      }
+    }
+
+    setConnections(newConnections);
+  };
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      recalculateLines();
+    }, 100);
+
+    window.addEventListener('resize', recalculateLines);
+    return () => {
+      clearTimeout(timer);
+      window.removeEventListener('resize', recalculateLines);
+    };
+  }, [selectedProjectId, selectedEmployeeId, weekEntries, projects.length]);
+
+  const activeProject = projects.find(p => p.id === selectedProjectId);
+  const activeEmployee = activeProject?.employees.find((e: any) => e.personId === selectedEmployeeId);
+
+  return (
+    <div className="bg-white border border-border-base rounded-xl shadow-sm overflow-hidden flex flex-col">
+      <div className="p-5 border-b border-border-base flex items-center justify-between">
+        <div>
+          <h3 className="text-sm font-black text-navy">Interactive Hours Workflow Flowchart</h3>
+          <p className="text-xs text-slate-400 mt-0.5">
+            Click a project node to view team members, then click a team member node to drill down to tasks of the selected project.
+          </p>
+        </div>
+      </div>
+
+      <div 
+        ref={containerRef}
+        className="node-workspace min-h-[500px] flex flex-row items-stretch gap-12 p-8 relative dot-grid-bg overflow-x-auto"
+      >
+        <style>{`
+          .dot-grid-bg {
+            background-color: #F8FAFC;
+            background-image: radial-gradient(#CBD5E1 1.2px, transparent 1.2px);
+            background-size: 18px 18px;
+          }
+          @keyframes strokeDash {
+            to {
+              stroke-dashoffset: -20;
+            }
+          }
+          .stroke-animated {
+            stroke-dasharray: 6, 4;
+            animation: strokeDash 0.8s linear infinite;
+          }
+        `}</style>
+
+        {/* SVG connection canvas */}
+        <svg className="absolute inset-0 pointer-events-none w-full h-full z-0">
+          {connections.map((conn, index) => (
+            <path
+              key={index}
+              d={conn.d}
+              fill="none"
+              stroke={conn.color}
+              strokeWidth={conn.strokeWidth}
+              className={conn.strokeWidth > 1.5 ? "stroke-animated" : ""}
+              style={{ transition: 'stroke 0.3s, stroke-width 0.3s' }}
+            />
+          ))}
+        </svg>
+
+        {/* COLUMN 1: PROJECTS */}
+        <div className="flex-1 max-w-[280px] flex flex-col gap-4 z-10 shrink-0">
+          <div className="text-[10px] uppercase font-black text-slate-400 tracking-wider mb-1 px-1">Projects</div>
+          <div className="flex flex-col gap-3 max-h-[500px] overflow-y-auto pr-1">
+            {projects.map((proj: any) => {
+              const isSelected = selectedProjectId === proj.id;
+              return (
+                <div
+                  key={proj.id}
+                  onClick={() => handleProjectSelect(proj.id)}
+                  className={`relative p-4 rounded-xl border-2 bg-white cursor-pointer transition-all duration-300 select-none shadow-xs group ${
+                    isSelected 
+                      ? 'border-dc-blue shadow-[0_4px_12px_rgba(30,144,232,0.12)]' 
+                      : 'border-slate-200 hover:border-slate-300 hover:shadow-sm'
+                  }`}
+                >
+                  <div className="flex flex-col gap-1">
+                    <span className="font-black text-xs text-navy group-hover:text-dc-blue transition-colors leading-normal">{proj.name}</span>
+                    <div className="flex items-center justify-between text-[10px] text-slate-500 mt-2 font-medium">
+                      <span>Total hours:</span>
+                      <strong className="text-dc-blue font-bold">{proj.totalHours} hrs</strong>
+                    </div>
+                    <div className="flex items-center justify-between text-[10px] text-slate-500 font-medium">
+                      <span>Bench/BAU:</span>
+                      <strong className="text-slate-600 font-bold">{proj.benchHours} hrs</strong>
+                    </div>
+                  </div>
+                  {/* Port handle */}
+                  <div 
+                    id={`port-out-proj-${proj.id}`}
+                    className={`absolute right-0 top-1/2 -translate-y-1/2 translate-x-1.5 w-3 h-3 rounded-full border-2 border-white shadow-sm transition-transform duration-300 ${
+                      isSelected ? 'bg-dc-blue scale-125' : 'bg-slate-300 hover:bg-slate-400'
+                    }`}
+                  />
+                </div>
+              );
+            })}
+            {projects.length === 0 && (
+              <div className="p-6 bg-slate-50 border border-slate-200 rounded-xl text-center text-slate-400 font-semibold text-[11px]">
+                No projects logged
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* COLUMN 2: EMPLOYEES */}
+        <div className="flex-1 max-w-[280px] flex flex-col gap-4 z-10 shrink-0">
+          <div className="text-[10px] uppercase font-black text-slate-400 tracking-wider mb-1 px-1">Team Members</div>
+          <div className="flex flex-col gap-3 max-h-[500px] overflow-y-auto pr-1">
+            {activeProject ? (
+              activeProject.employees.map((emp: any) => {
+                const isSelected = selectedEmployeeId === emp.personId;
+                return (
+                  <div
+                    key={emp.personId}
+                    onClick={() => handleEmployeeSelect(emp.personId)}
+                    className={`relative p-4 rounded-xl border-2 bg-white cursor-pointer transition-all duration-300 select-none shadow-xs group ${
+                      isSelected 
+                        ? 'border-purple-500 shadow-[0_4px_12px_rgba(139,92,246,0.12)]' 
+                        : 'border-slate-200 hover:border-slate-300 hover:shadow-sm'
+                    }`}
+                  >
+                    {/* Input Port handle */}
+                    <div 
+                      id={`port-in-emp-${selectedProjectId}-${emp.personId}`}
+                      className={`absolute left-0 top-1/2 -translate-y-1/2 -translate-x-1.5 w-3 h-3 rounded-full border-2 border-white shadow-sm transition-transform duration-300 ${
+                        isSelected ? 'bg-dc-blue scale-110' : 'bg-slate-300'
+                      }`}
+                    />
+                    
+                    <div className="flex flex-col gap-1.5">
+                      <span className="font-black text-xs text-navy group-hover:text-purple-600 transition-colors leading-none">{emp.name}</span>
+                      <span className="text-[9px] text-slate-400 font-semibold uppercase">{emp.role} &bull; {emp.department}</span>
+                      <div className="flex items-center justify-between text-[10px] mt-1.5 font-bold pt-1.5 border-t border-slate-100/60">
+                        <span className="text-slate-500 font-medium">Logged hours:</span>
+                        <span className="text-purple-600">{emp.totalHours} hrs</span>
+                      </div>
+                    </div>
+
+                    {/* Output Port handle */}
+                    <div 
+                      id={`port-out-emp-${selectedProjectId}-${emp.personId}`}
+                      className={`absolute right-0 top-1/2 -translate-y-1/2 translate-x-1.5 w-3 h-3 rounded-full border-2 border-white shadow-sm transition-transform duration-300 ${
+                        isSelected ? 'bg-purple-500 scale-125' : 'bg-slate-300 hover:bg-slate-400'
+                      }`}
+                    />
+                  </div>
+                );
+              })
+            ) : (
+              <div className="p-6 bg-slate-50/50 border border-slate-200 border-dashed rounded-xl text-center text-slate-400 font-medium text-[11px] h-32 flex items-center justify-center">
+                Select a project on the left to see team members
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* COLUMN 3: TASKS */}
+        <div className="flex-1 max-w-[340px] flex flex-col gap-4 z-10 shrink-0">
+          <div className="text-[10px] uppercase font-black text-slate-400 tracking-wider mb-1 px-1">Project Tasks Logged</div>
+          <div className="flex flex-col gap-3 max-h-[500px] overflow-y-auto pr-1">
+            {activeEmployee ? (
+              activeEmployee.tasks.map((task: any, idx: number) => (
+                <div
+                  key={idx}
+                  className="relative p-4 rounded-xl border border-slate-200 bg-white shadow-xs transition-shadow duration-300 hover:shadow-sm"
+                >
+                  {/* Input Port handle */}
+                  <div 
+                    id={`port-in-task-${idx}`}
+                    className="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-1.5 w-3 h-3 rounded-full bg-purple-500 border-2 border-white shadow-sm"
+                  />
+                  
+                  <div className="flex flex-col gap-2">
+                    <div className="flex items-start justify-between gap-3">
+                      <span className="font-black text-navy text-xs leading-tight">{task.name}</span>
+                      <span className="text-[9px] font-black text-dc-blue bg-blue-50 border border-blue-100 px-1.5 py-0.5 rounded-md shrink-0">
+                        {task.hours} hrs
+                      </span>
+                    </div>
+                    {task.notes && (
+                      <div className="text-[10px] text-slate-500 italic bg-slate-50 p-2 rounded-lg border border-slate-100/60 leading-relaxed font-sans font-medium">
+                        "{task.notes}"
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ))
+            ) : (
+              <div className="p-6 bg-slate-50/50 border border-slate-200 border-dashed rounded-xl text-center text-slate-400 font-medium text-[11px] h-32 flex items-center justify-center">
+                Select a team member to see task logs for this project
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

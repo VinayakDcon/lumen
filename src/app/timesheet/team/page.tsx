@@ -11,6 +11,7 @@ export default function TeamHoursPage() {
   const user = usePmoStore((state) => state.user);
   const programmes = usePmoStore((state) => state.programmes);
   const activeProgrammeId = usePmoStore((state) => state.activeProgrammeId);
+  const people = usePmoStore((state) => state.people);
   
   const isPMOOrAdmin = user?.role === "PMO" || user?.role === "ADMIN";
 
@@ -22,10 +23,13 @@ export default function TeamHoursPage() {
   // Active project helper
   const activeProg = programmes.find(p => p.id === activeProgrammeId);
 
+  // For PMO/Admin, they can toggle active filter. For others, active filter is ALWAYS true.
+  const isFiltered = (!isPMOOrAdmin || filterByActive) && !!activeProgrammeId;
+
   // Query timesheet report from backend
   const { data: reportData } = useTimesheetReportQuery(
     weeksRange,
-    filterByActive && isPMOOrAdmin && activeProgrammeId ? activeProgrammeId : undefined
+    isFiltered ? activeProgrammeId : undefined
   );
 
   const filteredEntries = reportData?.entries || [];
@@ -40,14 +44,43 @@ export default function TeamHoursPage() {
     ? parseFloat((totalHours / (uniquePeople.length * (weeksRange === -1 ? 1 : weeksRange))).toFixed(1))
     : 0.0;
 
-  // Build Pivot data structure
+  // Build list of people to display as rows in pivot table
   const peopleLogging = Array.from(new Set(filteredEntries.map((e: any) => e.person_name)));
-  
-  // Sort people names for order consistency
   peopleLogging.sort();
 
+  let allowedPeople: any[] = [];
+  if (isFiltered && activeProg) {
+    // 1. Get the list of all people assigned to the selected programme
+    const assignedPeople = people.filter(p => {
+      const personKey = `person-${p.id}`;
+      return activeProg.team_members?.includes(personKey);
+    });
+
+    const isLeadershipRole = isPMOOrAdmin || user?.role === "VP" || user?.role === "BU_HEAD" ||
+      user?.role === "SOFTWARE_LEAD" || user?.role === "MECHANICAL_LEAD" || user?.role === "ELECTRONICS_LEAD" || user?.role === "OPTICS_LEAD";
+
+    if (isLeadershipRole) {
+      allowedPeople = assignedPeople;
+    } else {
+      // Engineer / BD sees ONLY themselves
+      const selfPerson = people.find(p => p.email?.toLowerCase().trim() === user?.email?.toLowerCase().trim());
+      allowedPeople = selfPerson ? [selfPerson] : [];
+    }
+  } else {
+    // Unfiltered view (PMO/Admin only when filterByActive is unchecked)
+    // Display all people who logged hours
+    allowedPeople = peopleLogging.map(name => {
+      return people.find(p => p.name === name) || { id: name, name };
+    });
+  }
+
+  // Sort allowed people names
+  allowedPeople.sort((a, b) => a.name.localeCompare(b.name));
+
   // Get active columns (projects) in the filtered set
-  const projectCols = Array.from(new Set(filteredEntries.filter((e: any) => e.programme_id && e.programme_id !== "DC_BAU" && e.programme_id !== "BENCH_TIME").map((e: any) => e.programme_id as string))) as string[];
+  const projectCols = isFiltered && activeProgrammeId 
+    ? [activeProgrammeId] 
+    : Array.from(new Set(filteredEntries.filter((e: any) => e.programme_id && e.programme_id !== "DC_BAU" && e.programme_id !== "BENCH_TIME").map((e: any) => e.programme_id as string))) as string[];
   projectCols.sort();
 
   // Map project names / details for visual colors
@@ -57,7 +90,8 @@ export default function TeamHoursPage() {
   });
 
   // Compute pivot cell values
-  const pivotRows = peopleLogging.map((name: any) => {
+  const pivotRows = allowedPeople.map((person: any) => {
+    const name = person.name;
     const personEntries = filteredEntries.filter((e: any) => e.person_name === name);
     
     const projectHours: Record<string, number> = {};
@@ -67,7 +101,7 @@ export default function TeamHoursPage() {
     });
 
     const bench = personEntries.filter((e: any) => !e.programme_id || e.programme_id === "DC_BAU" || e.programme_id === "BENCH_TIME").reduce((sum: number, e: any) => sum + (e.hours || 0) + (e.blocked_hours || 0), 0);
-    const rowTotal = Object.values(projectHours).reduce((sum: number, v: any) => sum + v, 0) + bench;
+    const rowTotal = Object.values(projectHours).reduce((sum: number, v: any) => sum + v, 0) + (isFiltered ? 0 : bench);
 
     return {
       name,
@@ -188,19 +222,21 @@ export default function TeamHoursPage() {
                     </th>
                   );
                 })}
-                <th 
-                  className="p-3 text-center min-w-[100px] text-white font-bold bg-navy sticky top-0 z-20"
-                  style={{ borderBottom: "3px solid var(--color-warning-amber)" }}
-                >
-                  BENCH TIME
-                </th>
+                {!isFiltered && (
+                  <th 
+                    className="p-3 text-center min-w-[100px] text-white font-bold bg-navy sticky top-0 z-20"
+                    style={{ borderBottom: "3px solid var(--color-warning-amber)" }}
+                  >
+                    BENCH TIME
+                  </th>
+                )}
                 <th className="p-3 text-center min-w-[100px] bg-slate-800 sticky top-0 z-20">TOTAL</th>
               </tr>
             </thead>
             <tbody>
               {pivotRows.length === 0 ? (
                 <tr>
-                  <td colSpan={projectCols.length + 3} className="p-6 text-center text-slate-400 italic">
+                  <td colSpan={projectCols.length + (isFiltered ? 2 : 3)} className="p-6 text-center text-slate-400 italic">
                     No time logs found for the selected filter range.
                   </td>
                 </tr>
@@ -241,12 +277,14 @@ export default function TeamHoursPage() {
                             </td>
                           );
                         })}
-                        <td className={cn(
-                          "p-3 text-center font-medium transition-colors",
-                          row.bench > 0 ? "text-amber-900 font-bold bg-amber-500/10" : "text-slate-300"
-                        )}>
-                          {row.bench > 0 ? row.bench.toFixed(1) : "—"}
-                        </td>
+                        {!isFiltered && (
+                          <td className={cn(
+                            "p-3 text-center font-medium transition-colors",
+                            row.bench > 0 ? "text-amber-900 font-bold bg-amber-500/10" : "text-slate-300"
+                          )}>
+                            {row.bench > 0 ? row.bench.toFixed(1) : "—"}
+                          </td>
+                        )}
                         <td 
                           className={cn(
                             "p-3 text-center font-black text-navy transition-colors",
@@ -270,12 +308,14 @@ export default function TeamHoursPage() {
                         </td>
                       );
                     })}
-                    <td className={cn(
-                      "p-3 text-center font-bold",
-                      totalBench > 0 ? "text-amber-900 bg-amber-500/15" : "text-slate-300"
-                    )}>
-                      {totalBench > 0 ? totalBench.toFixed(1) : "—"}
-                    </td>
+                    {!isFiltered && (
+                      <td className={cn(
+                        "p-3 text-center font-bold",
+                        totalBench > 0 ? "text-amber-900 bg-amber-500/15" : "text-slate-300"
+                      )}>
+                        {totalBench > 0 ? totalBench.toFixed(1) : "—"}
+                      </td>
+                    )}
                     <td className="p-3 text-center text-navy bg-slate-200 font-black">{grandTotal.toFixed(1)}</td>
                   </tr>
                 </>

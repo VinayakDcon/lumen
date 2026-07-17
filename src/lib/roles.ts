@@ -51,6 +51,28 @@ const ROLE_TABS: Record<string, string[] | typeof ALL_TABS> = {
   PMO:   ALL_TABS,
   PM:    ALL_TABS, // legacy
 
+  VP: [
+    "programmes",
+    "dashboard", "charter", "journey", "dpds", "wbs", "gantt", "kanban",
+    "reports", "heatmap", "approvals",
+    "deliverables", "milestones", "risks", "dfmea", "changes",
+    "decisions", "meetings",
+    "documents", "standards", "tooling", "lab",
+    "skills", "resources",
+    "my-timesheet", "timesheet", "approvals-ts", "resource-utilization"
+  ],
+
+  BU_HEAD: [
+    "programmes",
+    "dashboard", "charter", "journey", "dpds", "wbs", "gantt", "kanban",
+    "reports", "heatmap", "approvals",
+    "deliverables", "milestones", "risks", "dfmea", "changes",
+    "decisions", "meetings",
+    "documents", "standards", "tooling", "lab",
+    "skills", "resources",
+    "my-timesheet", "timesheet", "approvals-ts", "resource-utilization"
+  ],
+
   PROJECT_MANAGER: [
     "programmes", "templates",
     "dashboard", "charter", "journey", "dpds", "wbs", "gantt", "kanban",
@@ -111,17 +133,17 @@ const ROLE_TABS: Record<string, string[] | typeof ALL_TABS> = {
 
   ENGINEER: [
     "programmes", "dashboard", "wbs", "gantt", "kanban",
-    "my-timesheet", "deliverables", "risks", "documents", "standards", "lab",
+    "my-timesheet", "timesheet", "deliverables", "risks", "documents", "standards", "lab",
   ],
 
   INTERN_SUPPORT_ENGINEER: [
     "programmes", "dashboard", "wbs", "gantt", "kanban",
-    "my-timesheet", "deliverables", "risks", "documents", "standards", "lab",
+    "my-timesheet", "timesheet", "deliverables", "risks", "documents", "standards", "lab",
   ],
 
   BUSINESS_DEVELOPMENT_EXECUTIVE: [
     "programmes", "dashboard", "wbs", "gantt", "kanban",
-    "my-timesheet", "deliverables", "milestones", "risks", "documents", "standards", "lab",
+    "my-timesheet", "timesheet", "deliverables", "risks", "documents", "standards", "lab",
   ],
 
   CUSTOMER: [
@@ -184,7 +206,7 @@ const ROLE_TABS: Record<string, string[] | typeof ALL_TABS> = {
 // Engineers and below are read-only on most sections (except own timesheet)
 const EDIT_ROLES = new Set([
   "ADMIN", "PMO", "PM",
-  "PROJECT_MANAGER",
+  "PROJECT_MANAGER", "VP", "BU_HEAD",
   "OPTICS_LEAD", "MECHANICAL_LEAD", "ELECTRONICS_LEAD", "SOFTWARE_LEAD",
   "TEAM_LEAD",
   "BU1HEAD", "BU2HEAD", "BU3HEAD",
@@ -253,6 +275,8 @@ export const ROLE_DISPLAY: Record<string, string> = {
   ADMIN: "Administrator",
   PMO: "Project Management Office",
   PROJECT_MANAGER: "Project Manager",
+  VP: "Vice President",
+  BU_HEAD: "Business Unit Head",
   OPTICS_LEAD: "Optics Lead",
   MECHANICAL_LEAD: "Mechanical Lead",
   ELECTRONICS_LEAD: "Electronics Lead",
