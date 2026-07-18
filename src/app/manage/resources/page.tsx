@@ -2,51 +2,167 @@
 
 import React, { useState, useMemo } from "react";
 import { usePmoStore } from "@/store/use-pmo-store";
-import { useProgrammeResourcesQuery, usePeopleQuery } from "@/hooks/use-pmo-queries";
+import { 
+  useResourcesQuery, 
+  usePeopleQuery, 
+  useTasksQuery,
+  useProgrammesQuery,
+  useCreateResourceMutation,
+  useUpdateResourceMutation
+} from "@/hooks/use-pmo-queries";
 import { 
   UsersRound, Search, Plus, Edit3, X, UserCheck
 } from "lucide-react";
-import { ProgrammeResource } from "@/types/pmo";
 import { cn } from "@/utils/cn";
 
 export default function ResourcesPage() {
   const activeProgrammeId = usePmoStore((state) => state.activeProgrammeId);
-  const addProgrammeResource = usePmoStore((state) => state.addProgrammeResource);
-  const updateProgrammeResource = usePmoStore((state) => state.updateProgrammeResource);
-  
-  const { data: resources = [], isLoading: isResourcesLoading } = useProgrammeResourcesQuery(activeProgrammeId);
-  const { data: people = [], isLoading: isPeopleLoading } = usePeopleQuery();
+  const currentUser = usePmoStore((state) => state.user);
 
-  const isLoading = isResourcesLoading || isPeopleLoading;
+  const { data: programmes = [] } = useProgrammesQuery();
+
+  // Find the active programme to access its team_members
+  const activeProgramme = useMemo(
+    () => programmes.find((p) => p.id === activeProgrammeId),
+    [programmes, activeProgrammeId]
+  );
+  
+  const { data: resources = [], isLoading: isResourcesLoading } = useResourcesQuery();
+  const { data: people = [], isLoading: isPeopleLoading } = usePeopleQuery();
+  const { data: tasks = [], isLoading: isTasksLoading } = useTasksQuery(activeProgrammeId);
+
+  const createResourceMutation = useCreateResourceMutation();
+  const updateResourceMutation = useUpdateResourceMutation();
+
+  const isLoading = isResourcesLoading || isPeopleLoading || isTasksLoading;
 
   // Filter states
   const [searchQuery, setSearchQuery] = useState("");
 
   // Modal states
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [editingResource, setEditingResource] = useState<ProgrammeResource | null>(null);
+  const [editingResource, setEditingResource] = useState<any | null>(null);
 
   // Form states
   const [formPersonId, setFormPersonId] = useState("");
   const [formRoleOverride, setFormRoleOverride] = useState("");
   const [formLevel, setFormLevel] = useState("");
   const [formRate, setFormRate] = useState<number>(0);
-  const [formCapacity, setFormCapacity] = useState<number>(40);
+  const [formCapacity, setFormCapacity] = useState<number>(45);
   const [formAllocated, setFormAllocated] = useState<number>(0);
 
-  // Computed / Joined Data
+  // Derive people from programme team_members (set during wizard creation)
+  const teamMemberPeople = useMemo(() => {
+    const rawMembers: string[] = Array.isArray(activeProgramme?.team_members)
+      ? (activeProgramme!.team_members as string[])
+      : [];
+    const personIds = new Set<string>(
+      rawMembers
+        .filter((m) => typeof m === "string" && m.startsWith("person-"))
+        .map((m) => m.replace("person-", ""))
+    );
+    return people.filter((p) => personIds.has(String(p.id)));
+  }, [activeProgramme, people]);
+
+  // Helper to calculate allocated hours for a resource
+  const resourceAllocHr = (resourceId: string) => {
+    let alloc = 0;
+    for (const t of tasks) {
+      if (t.level !== 3) continue;
+      const resField = t.resources || '';
+      const resList = resField.split(',').map((s) => s.trim().toUpperCase());
+      if (resList.includes(resourceId.toUpperCase())) {
+        const n = resList.filter(Boolean).length || 1;
+        alloc += (t.effort_hr || t.plan_hr || 0) / n;
+      }
+    }
+    return Math.round(alloc);
+  };
+
+  // Computed / Joined Data — merge resources table with team-member-derived rows
   const resourcesWithPeople = useMemo(() => {
-    return resources.map(res => {
-      const person = people.find(p => p.id === res.person_id);
-      return {
-        ...res,
-        personName: person?.name || "Unknown",
-        personEmail: person?.email || "",
-        avatar_color: person?.avatar_color || "#1E90E8",
-        resourceId: person?.resource_id || "—"
-      };
-    });
-  }, [resources, people]);
+    const rawMembers: string[] = Array.isArray(activeProgramme?.team_members)
+      ? (activeProgramme!.team_members as string[])
+      : [];
+
+    const legacyResourceIds = new Set<string>(
+      rawMembers.filter((m) => typeof m === "string" && !m.startsWith("person-"))
+    );
+
+    const assignedResourceIds = new Set<string>(
+      teamMemberPeople.map((p) => p.resource_id).filter(Boolean) as string[]
+    );
+
+    const rows: any[] = [];
+
+    // 1. Loop through assigned people
+    for (const person of teamMemberPeople) {
+      const r = person.resource_id ? resources.find((x) => x.id === person.resource_id) : null;
+      if (r) {
+        const alloc = resourceAllocHr(r.id);
+        rows.push({
+          id: `person-${person.id}`,
+          resourceId: r.id,
+          personName: person.name,
+          personEmail: person.email || '',
+          avatar_color: person.avatar_color || '#1E90E8',
+          role_override: r.name || r.id,
+          level: r.level || person.role || '—',
+          rate_per_hr: r.rate_inr || 0,
+          capacity_hr_per_wk: r.capacity_hr_per_wk || 45,
+          allocated_hr: alloc,
+          cost: alloc * (r.rate_inr || 0),
+          isTeamMember: true,
+          hasResourceLink: true,
+          rawResource: r,
+          rawPerson: person
+        });
+      } else {
+        rows.push({
+          id: `person-${person.id}`,
+          resourceId: person.resource_id || '—',
+          personName: person.name,
+          personEmail: person.email || '',
+          avatar_color: person.avatar_color || '#1E90E8',
+          role_override: person.role || '—',
+          level: '—',
+          rate_per_hr: 0,
+          capacity_hr_per_wk: 0,
+          allocated_hr: 0,
+          cost: 0,
+          isTeamMember: true,
+          hasResourceLink: false,
+          rawPerson: person
+        });
+      }
+    }
+
+    // 2. Loop through legacy resource IDs
+    for (const rid of legacyResourceIds) {
+      if (assignedResourceIds.has(rid)) continue;
+      const r = resources.find((x) => x.id === rid);
+      if (!r) continue;
+      const alloc = resourceAllocHr(r.id);
+      rows.push({
+        id: `resource-${r.id}`,
+        resourceId: r.id,
+        personName: r.name || r.id,
+        personEmail: '',
+        avatar_color: '#64748b',
+        role_override: r.name || r.id,
+        level: r.level || '—',
+        rate_per_hr: r.rate_inr || 0,
+        capacity_hr_per_wk: r.capacity_hr_per_wk || 45,
+        allocated_hr: alloc,
+        cost: alloc * (r.rate_inr || 0),
+        isTeamMember: false,
+        hasResourceLink: true,
+        rawResource: r
+      });
+    }
+
+    return rows;
+  }, [resources, people, teamMemberPeople, tasks, activeProgramme?.team_members]);
 
   // Filtered
   const filteredResources = useMemo(() => {
@@ -63,11 +179,11 @@ export default function ResourcesPage() {
   }, [resourcesWithPeople, searchQuery]);
 
   // Open modal
-  const handleOpenModal = (resource?: ProgrammeResource) => {
+  const handleOpenModal = (resource?: any) => {
     if (resource) {
       setEditingResource(resource);
-      setFormPersonId(resource.person_id);
-      setFormRoleOverride(resource.role_override || "");
+      setFormPersonId(resource.resourceId);
+      setFormRoleOverride(resource.personName || "");
       setFormLevel(resource.level || "");
       setFormRate(resource.rate_per_hr);
       setFormCapacity(resource.capacity_hr_per_wk);
@@ -78,7 +194,7 @@ export default function ResourcesPage() {
       setFormRoleOverride("");
       setFormLevel("");
       setFormRate(0);
-      setFormCapacity(40);
+      setFormCapacity(45);
       setFormAllocated(0);
     }
     setIsModalOpen(true);
@@ -88,27 +204,25 @@ export default function ResourcesPage() {
     e.preventDefault();
 
     if (!formPersonId) return;
+    const actor = currentUser?.username || 'System';
 
-    if (editingResource) {
-      updateProgrammeResource(editingResource.id, {
-        person_id: formPersonId,
-        role_override: formRoleOverride || undefined,
+    if (editingResource && editingResource.resourceId) {
+      updateResourceMutation.mutate({
+        id: editingResource.resourceId,
+        name: formRoleOverride || undefined,
         level: formLevel || undefined,
-        rate_per_hr: formRate,
+        rate_inr: formRate,
         capacity_hr_per_wk: formCapacity,
-        allocated_hr: formAllocated,
-        cost: formRate * formAllocated
+        actor
       });
     } else {
-      addProgrammeResource({
-        programme_id: activeProgrammeId,
-        person_id: formPersonId,
-        role_override: formRoleOverride || undefined,
+      createResourceMutation.mutate({
+        id: formPersonId,
+        name: formRoleOverride || formPersonId,
         level: formLevel || undefined,
-        rate_per_hr: formRate,
+        rate_inr: formRate,
         capacity_hr_per_wk: formCapacity,
-        allocated_hr: formAllocated,
-        cost: formRate * formAllocated
+        actor
       });
     }
     setIsModalOpen(false);
@@ -239,8 +353,8 @@ export default function ResourcesPage() {
                   </td>
                 </tr>
               ) : (
-                filteredResources.map((res) => (
-                  <tr key={res.id} className="hover:bg-slate-50/80 transition-colors group">
+              filteredResources.map((res) => (
+                  <tr key={res.id} className={cn("hover:bg-slate-50/80 transition-colors group", !res.hasResourceLink ? "bg-amber-50/10" : "")}>
                     <td className="px-6 py-4 font-mono text-xs font-bold text-slate-600">{res.resourceId}</td>
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-3">
@@ -250,7 +364,19 @@ export default function ResourcesPage() {
                         >
                           {getInitials(res.personName)}
                         </div>
-                        <span className="font-bold text-navy">{res.personName}</span>
+                        <div>
+                          <span className="font-bold text-navy">{res.personName}</span>
+                          {res.isTeamMember && (
+                            <span className="ml-2 text-[9px] font-bold uppercase tracking-wider text-blue-600 bg-blue-100 px-1.5 py-0.5 rounded">
+                              Team Member
+                            </span>
+                          )}
+                          {!res.hasResourceLink && (
+                            <span className="ml-2 text-[9px] font-bold uppercase tracking-wider text-amber-600 bg-amber-100 px-1.5 py-0.5 rounded">
+                              No Resource ID Linked
+                            </span>
+                          )}
+                        </div>
                       </div>
                     </td>
                     <td className="px-6 py-4 font-medium text-slate-700">{res.role_override || '—'}</td>
@@ -260,16 +386,21 @@ export default function ResourcesPage() {
                     <td className="px-6 py-4 text-right font-bold text-dc-blue">{res.allocated_hr} hr</td>
                     <td className="px-6 py-4 text-right font-bold text-navy">₹{res.cost.toLocaleString()}</td>
                     <td className="px-6 py-4 text-right">
-                      <button 
-                        onClick={() => handleOpenModal(res)}
-                        className="p-1.5 text-slate-400 hover:text-dc-blue hover:bg-blue-50 rounded transition-colors"
-                        title="Edit Assignment"
-                      >
-                        <Edit3 className="w-4 h-4" />
-                      </button>
+                      {res.hasResourceLink ? (
+                        <button 
+                          onClick={() => handleOpenModal(res)}
+                          className="p-1.5 text-slate-400 hover:text-dc-blue hover:bg-blue-50 rounded transition-colors"
+                          title="Edit Resource"
+                        >
+                          <Edit3 className="w-4 h-4" />
+                        </button>
+                      ) : (
+                        <span className="text-[10px] text-amber-600 italic font-medium">Link via Team</span>
+                      )}
                     </td>
                   </tr>
                 ))
+
               )}
             </tbody>
           </table>
@@ -283,7 +414,7 @@ export default function ResourcesPage() {
             <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
               <h3 className="font-bold text-lg text-navy flex items-center gap-2">
                 <UserCheck className="w-5 h-5 text-dc-blue" />
-                {editingResource ? "Edit Resource Assignment" : "Assign Resource"}
+                {editingResource ? "Edit Resource Profile" : "Create Resource Profile"}
               </h3>
               <button 
                 onClick={() => setIsModalOpen(false)}
@@ -297,42 +428,39 @@ export default function ResourcesPage() {
               <form id="resource-form" onSubmit={handleFormSubmit} className="space-y-4">
                 
                 <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-slate-600 uppercase tracking-wider">Person <span className="text-red-500">*</span></label>
-                  <select
+                  <label className="text-xs font-bold text-slate-600 uppercase tracking-wider">Resource ID <span className="text-red-500">*</span></label>
+                  <input 
+                    type="text" 
                     value={formPersonId}
-                    onChange={(e) => setFormPersonId(e.target.value)}
-                    className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-dc-blue"
+                    onChange={(e) => setFormPersonId(e.target.value.toUpperCase())}
+                    placeholder="e.g. OP_1 or SOP_1"
+                    className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-dc-blue transition-all font-mono"
                     required
-                    disabled={!!editingResource} // Cannot change person once assigned
-                  >
-                    <option value="">Select a person...</option>
-                    {people.map(p => (
-                      <option key={p.id} value={p.id}>{p.name} ({p.resource_id || 'No Resource ID'})</option>
-                    ))}
-                  </select>
+                    disabled={!!editingResource}
+                  />
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-1.5">
-                    <label className="text-xs font-bold text-slate-600 uppercase tracking-wider">Role (Override)</label>
-                    <input 
-                      type="text" 
-                      value={formRoleOverride}
-                      onChange={(e) => setFormRoleOverride(e.target.value)}
-                      placeholder="e.g. Lead Dev"
-                      className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-dc-blue transition-all"
-                    />
-                  </div>
-                  <div className="space-y-1.5">
-                    <label className="text-xs font-bold text-slate-600 uppercase tracking-wider">Level</label>
-                    <input 
-                      type="text" 
-                      value={formLevel}
-                      onChange={(e) => setFormLevel(e.target.value)}
-                      placeholder="e.g. Senior"
-                      className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-dc-blue transition-all"
-                    />
-                  </div>
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-slate-600 uppercase tracking-wider">Resource Name <span className="text-red-500">*</span></label>
+                  <input 
+                    type="text" 
+                    value={formRoleOverride}
+                    onChange={(e) => setFormRoleOverride(e.target.value)}
+                    placeholder="e.g. Optics Engineer"
+                    className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-dc-blue transition-all"
+                    required
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-slate-600 uppercase tracking-wider">Level / Grade</label>
+                  <input 
+                    type="text" 
+                    value={formLevel}
+                    onChange={(e) => setFormLevel(e.target.value)}
+                    placeholder="e.g. H5 (Software Lead)"
+                    className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-dc-blue transition-all"
+                  />
                 </div>
 
                 <div className="grid grid-cols-3 gap-4">
@@ -361,9 +489,8 @@ export default function ResourcesPage() {
                     <input 
                       type="number" 
                       value={formAllocated}
-                      onChange={(e) => setFormAllocated(Number(e.target.value))}
-                      className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-dc-blue transition-all"
-                      required
+                      className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm text-slate-500 font-medium focus:outline-none cursor-not-allowed"
+                      disabled
                     />
                   </div>
                 </div>
@@ -391,7 +518,7 @@ export default function ResourcesPage() {
                 form="resource-form"
                 className="btn-primary"
               >
-                {editingResource ? "Save Changes" : "Assign"}
+                {editingResource ? "Save Changes" : "Create"}
               </button>
             </div>
           </div>

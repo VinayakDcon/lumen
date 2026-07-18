@@ -59,7 +59,7 @@ const ROLE_TABS: Record<string, string[] | typeof ALL_TABS> = {
     "decisions", "meetings",
     "documents", "standards", "tooling", "lab",
     "skills", "resources",
-    "my-timesheet", "timesheet", "approvals-ts", "resource-utilization"
+    "my-timesheet", "timesheet", "resource-utilization"
   ],
 
   BU_HEAD: [
@@ -70,7 +70,7 @@ const ROLE_TABS: Record<string, string[] | typeof ALL_TABS> = {
     "decisions", "meetings",
     "documents", "standards", "tooling", "lab",
     "skills", "resources",
-    "my-timesheet", "timesheet", "approvals-ts", "resource-utilization"
+    "my-timesheet", "timesheet", "resource-utilization"
   ],
 
   PROJECT_MANAGER: [
@@ -81,7 +81,7 @@ const ROLE_TABS: Record<string, string[] | typeof ALL_TABS> = {
     "decisions", "meetings", "emails",
     "documents", "standards", "tooling", "lab",
     "team", "skills", "resources", "users",
-    "my-timesheet", "timesheet", "approvals-ts", "resource-utilization",
+    "my-timesheet", "timesheet", "resource-utilization",
   ],
 
   OPTICS_LEAD: [
@@ -90,7 +90,7 @@ const ROLE_TABS: Record<string, string[] | typeof ALL_TABS> = {
     "deliverables", "milestones", "risks", "dfmea",
     "documents", "standards", "lab",
     "skills", "resources",
-    "my-timesheet", "timesheet", "approvals-ts", "resource-utilization",
+    "my-timesheet", "timesheet", "resource-utilization",
   ],
 
   MECHANICAL_LEAD: [
@@ -99,7 +99,7 @@ const ROLE_TABS: Record<string, string[] | typeof ALL_TABS> = {
     "deliverables", "milestones", "risks", "dfmea",
     "documents", "standards", "lab",
     "skills", "resources",
-    "my-timesheet", "timesheet", "approvals-ts", "resource-utilization",
+    "my-timesheet", "timesheet", "resource-utilization",
   ],
 
   ELECTRONICS_LEAD: [
@@ -108,7 +108,7 @@ const ROLE_TABS: Record<string, string[] | typeof ALL_TABS> = {
     "deliverables", "milestones", "risks", "dfmea",
     "documents", "standards", "lab",
     "skills", "resources",
-    "my-timesheet", "timesheet", "approvals-ts", "resource-utilization",
+    "my-timesheet", "timesheet", "resource-utilization",
   ],
 
   SOFTWARE_LEAD: [
@@ -117,7 +117,7 @@ const ROLE_TABS: Record<string, string[] | typeof ALL_TABS> = {
     "deliverables", "milestones", "risks", "dfmea",
     "documents", "standards", "lab",
     "skills", "resources",
-    "my-timesheet", "timesheet", "approvals-ts", "resource-utilization",
+    "my-timesheet", "timesheet", "resource-utilization",
   ],
 
   TEAM_LEAD: [
@@ -128,7 +128,7 @@ const ROLE_TABS: Record<string, string[] | typeof ALL_TABS> = {
     "decisions", "meetings",
     "documents", "standards", "tooling", "lab",
     "skills", "resources",
-    "my-timesheet", "timesheet", "approvals-ts", "resource-utilization",
+    "my-timesheet", "timesheet", "resource-utilization",
   ],
 
   ENGINEER: [

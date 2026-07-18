@@ -592,6 +592,56 @@ export function useProgrammeResourcesQuery(pid: string) {
   });
 }
 
+export function useResourcesQuery() {
+  return useQuery<any[]>({
+    queryKey: ["resources"],
+    queryFn: async () => {
+      const res = await fetch("/api-proxy/resources");
+      if (!res.ok) throw new Error("Failed to fetch resources");
+      return res.json();
+    }
+  });
+}
+
+export function useCreateResourceMutation() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (data: { id: string; name: string; level?: string; rate_inr?: number; capacity_hr_per_wk?: number; actor?: string }) => {
+      const res = await fetch("/api-proxy/resources", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      });
+      if (!res.ok) {
+        const errorData = await res.json();
+        throw new Error(errorData.error || "Failed to create resource");
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["resources"] });
+    },
+  });
+}
+
+export function useUpdateResourceMutation() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, ...data }: { id: string; name?: string; level?: string; rate_inr?: number; capacity_hr_per_wk?: number; actor?: string }) => {
+      const res = await fetch(`/api-proxy/resources/${id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      });
+      if (!res.ok) throw new Error("Failed to update resource");
+      return res.json();
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["resources"] });
+    },
+  });
+}
+
 export function useTimeEntriesQuery() {
   const setTimeEntries = usePmoStore((state) => state.setTimeEntries);
   return useQuery<TimeEntry[]>({

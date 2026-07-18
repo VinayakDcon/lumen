@@ -11,8 +11,8 @@ export default function ApproveTimesheetsPage() {
   const programmes = usePmoStore((state) => state.programmes);
   const activeProgrammeId = usePmoStore((state) => state.activeProgrammeId);
 
-  // Role Gate: hide approvals tab content for unauthorized roles
-  const isApprover = user?.role && !["ENGINEER", "INTERN_SUPPORT_ENGINEER", "VIEWER", "CUSTOMER"].includes(user.role);
+  // Role Gate: only ADMIN and PMO can access the Approve Timesheets section
+  const isApprover = user?.role && ["ADMIN", "PMO"].includes(user.role);
 
   // Active project helper
   const activeProg = programmes.find((p) => p.id === activeProgrammeId);
