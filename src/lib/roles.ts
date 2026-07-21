@@ -41,6 +41,7 @@ export const ROUTE_TO_TAB: Record<string, string> = {
   "/timesheet/approvals":    "approvals-ts",
   "/timesheet/resources":    "resource-utilization",
   "/timesheet/analytics":    "hours-analytics",
+  "/programme/roadmaps":     "roadmaps",
 };
 
 // ─── Role → Allowed tabs ───────────────────────────────────────────────────
@@ -59,7 +60,7 @@ const ROLE_TABS: Record<string, string[] | typeof ALL_TABS> = {
     "decisions", "meetings",
     "documents", "standards", "tooling", "lab",
     "skills", "resources",
-    "my-timesheet", "timesheet", "resource-utilization"
+    "my-timesheet", "timesheet", "resource-utilization", "hours-analytics", "roadmaps"
   ],
 
   BU_HEAD: [
@@ -70,7 +71,7 @@ const ROLE_TABS: Record<string, string[] | typeof ALL_TABS> = {
     "decisions", "meetings",
     "documents", "standards", "tooling", "lab",
     "skills", "resources",
-    "my-timesheet", "timesheet", "resource-utilization"
+    "my-timesheet", "timesheet", "resource-utilization", "hours-analytics", "roadmaps"
   ],
 
   PROJECT_MANAGER: [
@@ -81,7 +82,7 @@ const ROLE_TABS: Record<string, string[] | typeof ALL_TABS> = {
     "decisions", "meetings", "emails",
     "documents", "standards", "tooling", "lab",
     "team", "skills", "resources", "users",
-    "my-timesheet", "timesheet", "resource-utilization",
+    "my-timesheet", "timesheet", "resource-utilization", "hours-analytics", "roadmaps",
   ],
 
   OPTICS_LEAD: [
@@ -90,7 +91,7 @@ const ROLE_TABS: Record<string, string[] | typeof ALL_TABS> = {
     "deliverables", "milestones", "risks", "dfmea",
     "documents", "standards", "lab",
     "skills", "resources",
-    "my-timesheet", "timesheet", "resource-utilization",
+    "my-timesheet", "timesheet", "resource-utilization", "hours-analytics", "roadmaps",
   ],
 
   MECHANICAL_LEAD: [
@@ -99,7 +100,7 @@ const ROLE_TABS: Record<string, string[] | typeof ALL_TABS> = {
     "deliverables", "milestones", "risks", "dfmea",
     "documents", "standards", "lab",
     "skills", "resources",
-    "my-timesheet", "timesheet", "resource-utilization",
+    "my-timesheet", "timesheet", "resource-utilization", "hours-analytics", "roadmaps",
   ],
 
   ELECTRONICS_LEAD: [
@@ -108,7 +109,7 @@ const ROLE_TABS: Record<string, string[] | typeof ALL_TABS> = {
     "deliverables", "milestones", "risks", "dfmea",
     "documents", "standards", "lab",
     "skills", "resources",
-    "my-timesheet", "timesheet", "resource-utilization",
+    "my-timesheet", "timesheet", "resource-utilization", "hours-analytics", "roadmaps",
   ],
 
   SOFTWARE_LEAD: [
@@ -117,7 +118,7 @@ const ROLE_TABS: Record<string, string[] | typeof ALL_TABS> = {
     "deliverables", "milestones", "risks", "dfmea",
     "documents", "standards", "lab",
     "skills", "resources",
-    "my-timesheet", "timesheet", "resource-utilization",
+    "my-timesheet", "timesheet", "resource-utilization", "hours-analytics", "roadmaps",
   ],
 
   TEAM_LEAD: [
@@ -128,21 +129,21 @@ const ROLE_TABS: Record<string, string[] | typeof ALL_TABS> = {
     "decisions", "meetings",
     "documents", "standards", "tooling", "lab",
     "skills", "resources",
-    "my-timesheet", "timesheet", "resource-utilization",
+    "my-timesheet", "timesheet", "resource-utilization", "hours-analytics", "roadmaps"
   ],
 
   ENGINEER: [
-    "programmes", "dashboard", "wbs", "gantt", "kanban",
+    "programmes", "dashboard", "wbs", "gantt", "kanban", "roadmaps",
     "my-timesheet", "timesheet", "deliverables", "risks", "documents", "standards", "lab",
   ],
 
   INTERN_SUPPORT_ENGINEER: [
-    "programmes", "dashboard", "wbs", "gantt", "kanban",
+    "programmes", "dashboard", "wbs", "gantt", "kanban", "roadmaps",
     "my-timesheet", "timesheet", "deliverables", "risks", "documents", "standards", "lab",
   ],
 
   BUSINESS_DEVELOPMENT_EXECUTIVE: [
-    "programmes", "dashboard", "wbs", "gantt", "kanban",
+    "programmes", "dashboard", "wbs", "gantt", "kanban", "roadmaps",
     "my-timesheet", "timesheet", "deliverables", "risks", "documents", "standards", "lab",
   ],
 

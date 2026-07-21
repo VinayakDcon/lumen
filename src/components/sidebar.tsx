@@ -90,6 +90,7 @@ export function Sidebar() {
         { label: "WBS", href: "/programme/wbs", icon: Network },
         { label: "Gantt", href: "/programme/gantt", icon: Calendar },
         { label: "Kanban", href: "/programme/kanban", icon: Kanban },
+        { label: "Roadmaps", href: "/programme/roadmaps", icon: Compass },
       ]
     },
     {
@@ -174,8 +175,12 @@ export function Sidebar() {
       >
         {/* Brand Header */}
         <div className="flex items-center gap-3 px-4 py-4 border-b border-slate-800 h-16 shrink-0">
-          <div className="w-9 h-9 bg-gold text-navy rounded flex items-center justify-center font-extrabold text-sm shrink-0">
-            DC
+          <div className="w-9 h-9 relative flex items-center justify-center shrink-0 rounded overflow-hidden">
+            <img 
+              src="/logo-cropped.png" 
+              alt="DC Logo" 
+              className="w-full h-full object-contain"
+            />
           </div>
           {!sidebarCollapsed && (
             <div className="truncate">

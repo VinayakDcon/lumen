@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useRef } from "react";
 import { useHoursAnalyticsQuery } from "@/hooks/use-pmo-queries";
+import { usePmoStore } from "@/store/use-pmo-store";
 import { 
   LineChart, Calendar, Users, Hourglass, TrendingUp, TrendingDown,
   Info, ShieldCheck, AlertCircle, HelpCircle
@@ -15,20 +16,24 @@ const PIE_COLORS = ["#1E90E8", "#10B981", "#8B5CF6", "#EC4899", "#F59E0B", "#14B
 
 export default function HoursAnalyticsPage() {
   const [selectedWeek, setSelectedWeek] = useState<string>("");
+  const user = usePmoStore((state) => state.user);
 
   // Fetch report data
-  const { data, isLoading } = useHoursAnalyticsQuery(selectedWeek || undefined);
+  const { data, isLoading } = useHoursAnalyticsQuery(user?.email, selectedWeek || undefined);
 
   const availableWeeks = data?.available_weeks || [];
   const activeWeek = data?.selected_week || "";
   const resourceHours = data?.resource_hours || [];
   const projectDistribution = data?.project_distribution || [];
   const departmentAverages = data?.department_averages || [];
+  const phaseDistribution = data?.phase_distribution || [];
 
   const totalHoursLogged = data?.total_hours_logged || 0;
   const activeEmployeesCount = data?.active_employees_count || 0;
   const mostActiveProject = data?.most_active_project || "N/A";
   const leastActiveProject = data?.least_active_project || "N/A";
+
+  const isPMOOrAdmin = user?.role === "PMO" || user?.role === "ADMIN" || user?.role === "PM";
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -404,42 +409,79 @@ export default function HoursAnalyticsPage() {
               </div>
             </div>
 
-            {/* Right Card - Department Averages */}
-            <div className="bg-white border border-border-base rounded-xl p-6 shadow-sm space-y-4">
-              <div>
-                <h3 className="text-sm font-black text-navy">Department Capacity Averages</h3>
-                <p className="text-xs text-slate-400 mt-0.5">
-                  Comparison of standard weekly average output logged per employee by department.
-                </p>
-              </div>
+            {/* Right Card - Department Averages (PMO/Admin) OR Phase Distribution (Leads/Heads) */}
+            {isPMOOrAdmin ? (
+              <div className="bg-white border border-border-base rounded-xl p-6 shadow-sm space-y-4">
+                <div>
+                  <h3 className="text-sm font-black text-navy">Department Capacity Averages</h3>
+                  <p className="text-xs text-slate-400 mt-0.5">
+                    Comparison of standard weekly average output logged per employee by department.
+                  </p>
+                </div>
 
-              <div className="h-[300px] w-full">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={departmentAverages} layout="vertical" margin={{ top: 20, right: 30, left: 20, bottom: 20 }}>
-                    <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#F1F5F9" />
-                    <XAxis type="number" tick={{ fill: "#64748B", fontSize: 10, fontWeight: "bold" }} stroke="#E2E8F0" />
-                    <YAxis dataKey="department" type="category" tick={{ fill: "#64748B", fontSize: 11, fontWeight: "bold" }} stroke="#E2E8F0" />
-                    <Tooltip 
-                      cursor={{ fill: '#F8FAFC' }}
-                      content={({ active, payload }) => {
-                        if (active && payload && payload.length) {
-                          const item = payload[0].payload;
-                          return (
-                            <div className="bg-white border border-border-base rounded-xl p-2.5 shadow-md text-xs">
-                              <p className="font-black text-navy">{item.department} Department</p>
-                              <p className="text-slate-500 mt-1">Average Hours / Employee: <strong className="text-purple-600">{item.average_hours} hrs</strong></p>
-                              <p className="text-slate-400 text-[10px] mt-0.5">Total logged: {item.total_hours} hrs across {item.employees_count} team members</p>
-                            </div>
-                          );
-                        }
-                        return null;
-                      }}
-                    />
-                    <Bar dataKey="average_hours" fill="#8B5CF6" radius={[0, 4, 4, 0]} maxBarSize={30} />
-                  </BarChart>
-                </ResponsiveContainer>
+                <div className="h-[300px] w-full">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={departmentAverages} layout="vertical" margin={{ top: 20, right: 30, left: 20, bottom: 20 }}>
+                      <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#F1F5F9" />
+                      <XAxis type="number" tick={{ fill: "#64748B", fontSize: 10, fontWeight: "bold" }} stroke="#E2E8F0" />
+                      <YAxis dataKey="department" type="category" tick={{ fill: "#64748B", fontSize: 11, fontWeight: "bold" }} stroke="#E2E8F0" />
+                      <Tooltip 
+                        cursor={{ fill: '#F8FAFC' }}
+                        content={({ active, payload }) => {
+                          if (active && payload && payload.length) {
+                            const item = payload[0].payload;
+                            return (
+                              <div className="bg-white border border-border-base rounded-xl p-2.5 shadow-md text-xs">
+                                <p className="font-black text-navy">{item.department} Department</p>
+                                <p className="text-slate-500 mt-1">Average Hours / Employee: <strong className="text-purple-600">{item.average_hours} hrs</strong></p>
+                                <p className="text-slate-400 text-[10px] mt-0.5">Total logged: {item.total_hours} hrs across {item.employees_count} team members</p>
+                              </div>
+                            );
+                          }
+                          return null;
+                        }}
+                      />
+                      <Bar dataKey="average_hours" fill="#8B5CF6" radius={[0, 4, 4, 0]} maxBarSize={30} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
               </div>
-            </div>
+            ) : (
+              <div className="bg-white border border-border-base rounded-xl p-6 shadow-sm space-y-4">
+                <div>
+                  <h3 className="text-sm font-black text-navy">Project Phase Hour Distribution</h3>
+                  <p className="text-xs text-slate-400 mt-0.5">
+                    Breakdown of weekly logged hours across different project gates and phases.
+                  </p>
+                </div>
+
+                <div className="h-[300px] w-full">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={phaseDistribution} layout="vertical" margin={{ top: 20, right: 30, left: 20, bottom: 20 }}>
+                      <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#F1F5F9" />
+                      <XAxis type="number" tick={{ fill: "#64748B", fontSize: 10, fontWeight: "bold" }} stroke="#E2E8F0" />
+                      <YAxis dataKey="phase" type="category" tick={{ fill: "#64748B", fontSize: 11, fontWeight: "bold" }} stroke="#E2E8F0" />
+                      <Tooltip 
+                        cursor={{ fill: '#F8FAFC' }}
+                        content={({ active, payload }) => {
+                          if (active && payload && payload.length) {
+                            const item = payload[0].payload;
+                            return (
+                              <div className="bg-white border border-border-base rounded-xl p-2.5 shadow-md text-xs">
+                                <p className="font-black text-navy">{item.phase}</p>
+                                <p className="text-slate-500 mt-1">Total Effort: <strong className="text-purple-600">{item.total_hours} hrs</strong></p>
+                              </div>
+                            );
+                          }
+                          return null;
+                        }}
+                      />
+                      <Bar dataKey="total_hours" fill="#8B5CF6" radius={[0, 4, 4, 0]} maxBarSize={30} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Interactive Hours Workflow Flowchart */}

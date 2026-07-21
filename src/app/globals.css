@@ -7,7 +7,7 @@
   --color-dc-soft: #E8F2FC;
   --color-gold: #C9A95A;
   --color-gold-light: #FFFBF0;
-  
+
   --color-success-green: #16A34A;
   --color-success-bg: #DCFCE7;
   --color-warning-amber: #D97706;
@@ -22,22 +22,23 @@
   --color-grey-500: #6B7280;
   --color-grey-700: #374151;
   --color-grey-900: #1F2937;
-  
+
   --color-bg-base: var(--background);
   --color-border-base: var(--border-color);
 }
 
 :root {
-  --background: #FAFAFA; /* Ghost White */
+  --background: #FAFAFA;
+  /* Ghost White */
   --background-secondary: #F1F5F9;
   --card-bg: #FFFFFF;
   --sidebar-bg: #0D1B2E;
   --table-header-bg: #0D1B2E;
   --border-color: #E2E8F0;
-  
+
   --primary-btn: #1E90E8;
   --primary-btn-hover: #0B5BAF;
-  
+
   --text-primary: #0D1B2E;
   --text-secondary: #475569;
   --text-muted: #94A3B8;
@@ -65,13 +66,16 @@ body {
   width: 6px;
   height: 6px;
 }
+
 ::-webkit-scrollbar-track {
   background: transparent;
 }
+
 ::-webkit-scrollbar-thumb {
   background: var(--border-color);
   border-radius: 3px;
 }
+
 ::-webkit-scrollbar-thumb:hover {
   background: var(--text-muted);
 }
@@ -84,6 +88,7 @@ body {
 .hover-lift {
   transition: transform 0.15s ease, box-shadow 0.15s ease;
 }
+
 .hover-lift:hover {
   transform: translateY(-2px);
   box-shadow: 0 4px 12px rgba(15, 23, 42, 0.06);
@@ -94,6 +99,7 @@ body {
   position: relative;
   overflow: hidden;
 }
+
 .commercial-hidden::after {
   content: '🔒';
   position: absolute;
@@ -127,8 +133,8 @@ body {
   padding: 8px 16px;
   border-radius: 8px;
   border: 2px solid var(--primary-btn-hover) !important;
-  box-shadow: 
-    inset 2px 2px 4px rgba(255, 255, 255, 0.25), 
+  box-shadow:
+    inset 2px 2px 4px rgba(255, 255, 255, 0.25),
     inset -2px -2px 4px rgba(0, 0, 0, 0.15),
     0 4px 6px rgba(37, 99, 235, 0.15);
   cursor: pointer;
@@ -138,16 +144,16 @@ body {
 .btn-primary:hover {
   background-color: var(--primary-btn-hover) !important;
   transform: translateY(-1px);
-  box-shadow: 
-    inset 2px 2px 4px rgba(255, 255, 255, 0.3), 
+  box-shadow:
+    inset 2px 2px 4px rgba(255, 255, 255, 0.3),
     inset -2px -2px 4px rgba(0, 0, 0, 0.2),
     0 6px 12px rgba(37, 99, 235, 0.25);
 }
 
 .btn-primary:active {
   transform: translateY(1px);
-  box-shadow: 
-    inset 1px 1px 2px rgba(255, 255, 255, 0.2), 
+  box-shadow:
+    inset 1px 1px 2px rgba(255, 255, 255, 0.2),
     inset -1px -1px 2px rgba(0, 0, 0, 0.1);
 }
 
@@ -162,7 +168,7 @@ body {
   padding: 8px 16px;
   border-radius: 8px;
   border: 1px solid var(--border-color) !important;
-  box-shadow: 
+  box-shadow:
     inset 1px 1px 2px rgba(255, 255, 255, 0.1),
     inset -1px -1px 2px rgba(0, 0, 0, 0.05);
   cursor: pointer;
@@ -172,7 +178,7 @@ body {
 .btn-secondary:hover {
   background-color: var(--border-color) !important;
   color: var(--text-primary) !important;
-  box-shadow: 
+  box-shadow:
     inset 1px 1px 2px rgba(255, 255, 255, 0.2),
     inset -1px -1px 2px rgba(0, 0, 0, 0.08);
 }
@@ -222,7 +228,8 @@ main {
 
 thead tr {
   background-color: var(--table-header-bg) !important;
-  color: #C9A95A !important; /* Gold text */
+  color: #C9A95A !important;
+  /* Gold text */
 }
 
 /* Global text utility matching overrides for dark mode */
@@ -252,8 +259,8 @@ thead tr {
   border-color: var(--border-color) !important;
 }
 
-.divide-slate-100 > :not([hidden]) ~ :not([hidden]),
-.divide-slate-200 > :not([hidden]) ~ :not([hidden]) {
+.divide-slate-100> :not([hidden])~ :not([hidden]),
+.divide-slate-200> :not([hidden])~ :not([hidden]) {
   border-color: var(--border-color) !important;
 }
 

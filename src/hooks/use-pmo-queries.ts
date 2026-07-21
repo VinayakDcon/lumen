@@ -675,13 +675,17 @@ export function useTimesheetReportQuery(weeks: number, pid?: string) {
   });
 }
 
-export function useHoursAnalyticsQuery(week?: string) {
+export function useHoursAnalyticsQuery(email?: string, week?: string) {
   return useQuery<any>({
-    queryKey: ["hoursAnalytics", week],
+    queryKey: ["hoursAnalytics", email, week],
     queryFn: async () => {
       let url = "/api-proxy/reports/hours-analytics";
-      if (week) {
-        url += `?week=${encodeURIComponent(week)}`;
+      const params = new URLSearchParams();
+      if (email) params.append("email", email);
+      if (week) params.append("week", week);
+      const queryStr = params.toString();
+      if (queryStr) {
+        url += `?${queryStr}`;
       }
       const res = await fetch(url);
       if (!res.ok) throw new Error("Failed to fetch hours analytics report");

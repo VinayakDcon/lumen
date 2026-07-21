@@ -20,16 +20,7 @@ export const metadata: Metadata = {
   title: "DContour PM Platform",
   description: "Enterprise Program Management Platform - DContour PM",
   icons: {
-    icon: [
-      {
-        url: "/favicon-light.ico",
-        media: "(prefers-color-scheme: light)",
-      },
-      {
-        url: "/favicon-dark.ico",
-        media: "(prefers-color-scheme: dark)",
-      },
-    ],
+    icon: "/logo-cropped.png",
   },
 };
 

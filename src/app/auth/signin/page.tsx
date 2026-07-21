@@ -78,21 +78,21 @@ function SignInForm() {
             )}
 
             {/* Prompt Description */}
-            <p className="text-slate-500 dark:text-slate-400 text-center mb-8 text-[12px] leading-relaxed max-w-[320px] mx-auto font-medium">
-              Please sign in using your corporate Microsoft account to access the <span className="font-bold text-slate-700 dark:text-slate-200">DContour PM</span> Program Management Platform.
+            <p className="text-slate-500 text-center mb-8 text-[12px] leading-relaxed max-w-[320px] mx-auto font-medium">
+              Please sign in using your corporate Microsoft account to access the <span className="font-bold text-slate-700">DContour PM</span> Program Management Platform.
             </p>
 
-            {/* Microsoft Sign-In Button */}
+            {/* Microsoft Sign-In Button (Gradient blue to black) */}
             <button
               onClick={handleSignIn}
               disabled={isLoading}
-              className="group relative w-full bg-slate-900 dark:bg-slate-800 text-white py-3 px-4 rounded-xl text-xs font-semibold hover:bg-slate-800 dark:hover:bg-slate-700 border border-transparent dark:border-slate-700 disabled:bg-slate-800/85 transition-all duration-200 flex items-center justify-center gap-3 cursor-pointer shadow-md hover:shadow-lg active:scale-[0.98] overflow-hidden"
+              className="group relative w-full bg-gradient-to-r from-dc-blue to-black hover:from-dc-deep hover:to-slate-950 text-white py-3 px-4 rounded-xl text-xs font-semibold disabled:from-slate-800 disabled:to-slate-900 transition-all duration-200 flex items-center justify-center gap-3 cursor-pointer shadow-md hover:shadow-lg active:scale-[0.98] overflow-hidden"
             >
               {/* Hover reflection animation effect */}
               <div className="absolute inset-0 w-1/2 h-full bg-white/10 skew-x-[-20deg] translate-x-[-150%] group-hover:translate-x-[250%] transition-transform duration-1000 ease-out" />
               
               {isLoading ? (
-                <Loader2 className="w-4 h-4 animate-spin text-gold shrink-0" />
+                <Loader2 className="w-4 h-4 animate-spin text-white shrink-0" />
               ) : (
                 <svg className="w-4 h-4 shrink-0 transition-transform duration-200 group-hover:scale-110" viewBox="0 0 23 23" fill="none" xmlns="http://www.w3.org/2000/svg">
                   <rect width="11" height="11" fill="#F25022"/>
@@ -106,8 +106,8 @@ function SignInForm() {
             </button>
 
             {/* Security Notice Footer */}
-            <div className="flex items-center justify-center gap-1.5 mt-8 text-[10px] text-slate-400 dark:text-slate-500 font-bold">
-              <Lock className="w-3.5 h-3.5 text-slate-300 dark:text-slate-650" />
+            <div className="flex items-center justify-center gap-1.5 mt-8 text-[10px] text-slate-400 font-bold">
+              <Lock className="w-3.5 h-3.5 text-slate-300" />
               <span>Secure Enterprise Single Sign-On</span>
             </div>
           </div>
