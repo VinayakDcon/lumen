@@ -8,7 +8,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/utils/cn";
 import { usePathname } from "next/navigation";
-import { useActiveProgrammeQuery } from "@/hooks/use-pmo-queries";
+import { useProgrammesQuery } from "@/hooks/use-pmo-queries";
 import { signOut } from "next-auth/react";
 
 export function Header() {
@@ -28,7 +28,9 @@ export function Header() {
 
 
 
-  const { data: activeProgramme } = useActiveProgrammeQuery(activeProgrammeId);
+  // Derive active programme directly from the list query (avoids a separate GET that 404s)
+  const { data: programmes } = useProgrammesQuery();
+  const activeProgramme = programmes?.find(p => p.id === activeProgrammeId) ?? null;
 
   const handleToggleSidebar = () => {
     if (typeof window !== "undefined") {

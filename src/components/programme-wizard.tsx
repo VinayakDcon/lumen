@@ -417,10 +417,16 @@ export function ProgrammeWizard() {
         if (res.ok) {
           const updated = await res.json();
 
-          // Fix 1: Use editId (the actual store key), not payload.id
+          // Update Zustand store immediately (instant UI feedback)
           updateProgramme(editId, updated);
 
-          // Fix 2: Invalidate BOTH old ID and new ID keys so no stale cache remains
+          // If ID changed, update the active programme ID in store + localStorage
+          if (editId !== payload.id) {
+            localStorage.setItem("pmo_active_programme_id", payload.id);
+            switchProgramme(payload.id);
+          }
+
+          // Invalidate all related query keys (old + new ID)
           queryClient.invalidateQueries({ queryKey: ["programmes"] });
           queryClient.invalidateQueries({ queryKey: ["programme", editId] });
           queryClient.invalidateQueries({ queryKey: ["programme", payload.id] });
@@ -428,15 +434,15 @@ export function ProgrammeWizard() {
           queryClient.invalidateQueries({ queryKey: ["journey", payload.id] });
           queryClient.invalidateQueries({ queryKey: ["charter", editId] });
           queryClient.invalidateQueries({ queryKey: ["charter", payload.id] });
+          queryClient.invalidateQueries({ queryKey: ["dashboard", editId] });
+          queryClient.invalidateQueries({ queryKey: ["dashboard", payload.id] });
 
-          // Fix 3: If the ID changed, update localStorage so SessionSync restores the correct programme on reload
-          if (editId !== payload.id) {
-            localStorage.setItem("pmo_active_programme_id", payload.id);
-          }
+          // Force an immediate refetch of the programmes list so UI updates right away
+          // (DO NOT window.location.reload() — that destroys the cache and the single-GET 404s again)
+          await queryClient.refetchQueries({ queryKey: ["programmes"] });
 
           alert(`✓ Programme "${payload.name}" updated successfully`);
           closeProgrammeWizard();
-          window.location.reload();
         } else {
           const errData = await res.json().catch(() => ({}));
           alert(`Failed to update programme: ${errData.error || res.statusText}`);
