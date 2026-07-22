@@ -395,7 +395,7 @@ export function ProgrammeWizard() {
 
     if (wizardMode === "edit") {
       try {
-        const res = await fetch(`/api-proxy/programmes/${payload.id}`, {
+        const res = await fetch(`/api-proxy/programmes/${editId}`, {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(payload)
