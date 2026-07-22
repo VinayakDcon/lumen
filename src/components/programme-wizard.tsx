@@ -524,7 +524,7 @@ export function ProgrammeWizard() {
                     placeholder="e.g., BG_AUTO_2026"
                     value={wizForm.id}
                     disabled={wizardMode === "edit"}
-                    onChange={(e) => setWizForm(prev => ({ ...prev, id: e.target.value }))}
+                    onChange={(e) => setWizForm(prev => ({ ...prev, id: e.target.value.toUpperCase() }))}
                     className={cn(
                       "w-full border border-slate-200 rounded px-3 py-2 text-xs focus:outline-none focus:border-dc-blue uppercase font-bold",
                       wizardMode === "edit" ? "bg-slate-100 text-slate-500 cursor-not-allowed border-slate-200" : ""
