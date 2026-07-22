@@ -19,13 +19,20 @@ export function useProgrammesQuery() {
 }
 
 export function useActiveProgrammeQuery(id: string) {
+  const { data: programmes } = useProgrammesQuery();
   return useQuery<Programme | null>({
     queryKey: ["programme", id],
     queryFn: async () => {
-      const res = await fetch(`/api-proxy/programmes/${id}`);
-      if (!res.ok) throw new Error("Failed to fetch");
-      return res.json();
+      if (!id) return null;
+      try {
+        const res = await fetch(`/api-proxy/programmes/${id}`);
+        if (res.ok) return await res.json();
+      } catch (e) {
+        console.error("Error fetching single programme:", e);
+      }
+      return programmes?.find(p => p.id === id) || null;
     },
+    initialData: () => programmes?.find(p => p.id === id) || null,
     enabled: !!id,
   });
 }
