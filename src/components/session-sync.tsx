@@ -60,10 +60,10 @@ export default function SessionSync() {
     };
 
     const syncUser = async () => {
-      // Get email from session (real MS Auth) OR from mock (auth.ts bypass)
+      // Get email from session (real MS Auth) OR from env-var-gated dev bypass
       const email =
         session?.user?.email ||
-        "vinayak.chouhan@dcontour.tech"; // fallback for no-auth dev mode
+        (process.env.NEXT_PUBLIC_BYPASS_AUTH === "true" ? "dev@dcontour.tech" : "");
 
       // The session may already have a role set (from auth.ts mock or real callback)
       const sessionRole = (session as any)?.role as string | undefined;
@@ -107,12 +107,12 @@ export default function SessionSync() {
           }
         }
 
-        // Fetch notifications initially and start polling
+        // Fetch notifications initially, then poll every 60s (not 5s) to avoid backend hammering
         await fetchNotifications(email);
         
         pollingInterval = setInterval(() => {
           fetchNotifications(email);
-        }, 5000);
+        }, 60000);
 
       } catch (err) {
         console.error("[SessionSync] Could not resolve user from /api/me:", err);

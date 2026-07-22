@@ -138,18 +138,23 @@ export function useTasksQuery(id: string) {
 export function useEvmReportQuery(id: string, week?: number) {
   const getEvmReport = usePmoStore((state) => state.getEvmReport);
   const setTasks = usePmoStore((state) => state.setTasks);
-  
+  const qc = useQueryClient();
+
   return useQuery<EvmReport>({
     queryKey: ["evmReport", id, week],
     queryFn: async () => {
-      const res = await fetch(`/api-proxy/tasks/programme/${id}`);
-      if (!res.ok) throw new Error("Failed to fetch tasks");
-      const data = await res.json();
-      const normalized = data.map((t: any) => ({
-        ...t,
-        blocked_hr: t.blocked_hr !== undefined ? t.blocked_hr : (t.blocked_hours || 0)
-      }));
-      setTasks(normalized, id);
+      // BUG-09 fix: reuse already-fetched tasks from cache; only re-fetch if missing
+      let normalized = qc.getQueryData<Task[]>(["tasks", id]);
+      if (!normalized) {
+        const res = await fetch(`/api-proxy/tasks/programme/${id}`);
+        if (!res.ok) throw new Error("Failed to fetch tasks");
+        const data = await res.json();
+        normalized = data.map((t: any) => ({
+          ...t,
+          blocked_hr: t.blocked_hr !== undefined ? t.blocked_hr : (t.blocked_hours || 0)
+        }));
+        setTasks(normalized, id);
+      }
       return getEvmReport(id, week);
     },
     enabled: !!id,
@@ -159,18 +164,23 @@ export function useEvmReportQuery(id: string, week?: number) {
 export function useHeatmapReportQuery(id: string) {
   const getHeatmapReport = usePmoStore((state) => state.getHeatmapReport);
   const setTasks = usePmoStore((state) => state.setTasks);
-  
+  const qc = useQueryClient();
+
   return useQuery<HeatmapReport>({
     queryKey: ["heatmapReport", id],
     queryFn: async () => {
-      const res = await fetch(`/api-proxy/tasks/programme/${id}`);
-      if (!res.ok) throw new Error("Failed to fetch tasks");
-      const data = await res.json();
-      const normalized = data.map((t: any) => ({
-        ...t,
-        blocked_hr: t.blocked_hr !== undefined ? t.blocked_hr : (t.blocked_hours || 0)
-      }));
-      setTasks(normalized, id);
+      // BUG-09 fix: reuse already-fetched tasks from cache; only re-fetch if missing
+      let normalized = qc.getQueryData<Task[]>(["tasks", id]);
+      if (!normalized) {
+        const res = await fetch(`/api-proxy/tasks/programme/${id}`);
+        if (!res.ok) throw new Error("Failed to fetch tasks");
+        const data = await res.json();
+        normalized = data.map((t: any) => ({
+          ...t,
+          blocked_hr: t.blocked_hr !== undefined ? t.blocked_hr : (t.blocked_hours || 0)
+        }));
+        setTasks(normalized, id);
+      }
       return getHeatmapReport(id);
     },
     enabled: !!id,

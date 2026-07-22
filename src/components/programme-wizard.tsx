@@ -222,7 +222,8 @@ export function ProgrammeWizard() {
         cloned_from: programmes[0]?.id || ""
       });
     }
-  }, [isWizOpen, wizardMode, editId, programmes]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isWizOpen, wizardMode, editId]);
 
   // Modal Listener for archetype/template selection from other pages
   useEffect(() => {
@@ -283,7 +284,7 @@ export function ProgrammeWizard() {
     };
     window.addEventListener("open-programme-wizard", handleOpenWizardEvent);
     return () => window.removeEventListener("open-programme-wizard", handleOpenWizardEvent);
-  }, [programmes]);
+  }, []);
 
 
   // Recalculate weeks when kickoff or SOP target changes
@@ -352,6 +353,19 @@ export function ProgrammeWizard() {
         return;
       }
     }
+    // BUG-04: Validate phase data before advancing from Step 3
+    if (wizStep === 3) {
+      for (const p of wizPhases) {
+        if (!p.code?.trim() || !p.name?.trim()) {
+          alert("All phases must have a Code and Name.");
+          return;
+        }
+        if (p.end_wk < p.start_wk) {
+          alert(`Phase "${p.name}": End week must be ≥ Start week.`);
+          return;
+        }
+      }
+    }
     const maxSteps = wizardMode === "edit" ? 4 : 5;
     if (wizStep < maxSteps) {
       setWizStep(prev => prev + 1);
@@ -380,7 +394,7 @@ export function ProgrammeWizard() {
       status: wizForm.status as any,
       kickoff_date: wizForm.kickoff_date || null,
       sop_target: wizForm.sop_target || null,
-      total_kits: parseInt(wizForm.total_kits) || null,
+      total_kits: wizForm.total_kits !== "" ? parseInt(wizForm.total_kits) : null,
       programme_weeks: parseInt(wizForm.programme_weeks) || 56,
       scope_parts: isCustomer ? csv(wizForm.parts) : [],
       markets: isCustomer ? csv(wizForm.markets) : [],
@@ -402,20 +416,34 @@ export function ProgrammeWizard() {
         });
         if (res.ok) {
           const updated = await res.json();
-          updateProgramme(payload.id, updated);
+
+          // Fix 1: Use editId (the actual store key), not payload.id
+          updateProgramme(editId, updated);
+
+          // Fix 2: Invalidate BOTH old ID and new ID keys so no stale cache remains
           queryClient.invalidateQueries({ queryKey: ["programmes"] });
+          queryClient.invalidateQueries({ queryKey: ["programme", editId] });
           queryClient.invalidateQueries({ queryKey: ["programme", payload.id] });
+          queryClient.invalidateQueries({ queryKey: ["journey", editId] });
           queryClient.invalidateQueries({ queryKey: ["journey", payload.id] });
+          queryClient.invalidateQueries({ queryKey: ["charter", editId] });
           queryClient.invalidateQueries({ queryKey: ["charter", payload.id] });
+
+          // Fix 3: If the ID changed, update localStorage so SessionSync restores the correct programme on reload
+          if (editId !== payload.id) {
+            localStorage.setItem("pmo_active_programme_id", payload.id);
+          }
+
           alert(`✓ Programme "${payload.name}" updated successfully`);
           closeProgrammeWizard();
           window.location.reload();
         } else {
-          alert(`Failed to update programme: ${res.statusText}`);
+          const errData = await res.json().catch(() => ({}));
+          alert(`Failed to update programme: ${errData.error || res.statusText}`);
         }
       } catch (err) {
         console.error("Error updating programme:", err);
-        updateProgramme(payload.id, payload as any);
+        updateProgramme(editId, payload as any);
         alert(`✓ Programme "${payload.name}" updated (Local Preview Mode)`);
         closeProgrammeWizard();
       }
@@ -431,22 +459,21 @@ export function ProgrammeWizard() {
           const newProg = await res.json();
           addProgramme(newProg);
           queryClient.invalidateQueries({ queryKey: ["programmes"] });
+          closeProgrammeWizard();
+          localStorage.removeItem("dc_wizard_draft");
+          switchProgramme(payload.id);
+          alert(`✓ Programme "${payload.name}" created successfully`);
+          window.location.reload();
         } else {
-          addProgramme(payload as any);
+          const errData = await res.json().catch(() => ({}));
+          alert(`Failed to create programme: ${errData.error || res.statusText}`);
         }
-        closeProgrammeWizard();
-        localStorage.removeItem("dc_wizard_draft");
-        switchProgramme(payload.id);
-        alert(`✓ Programme "${payload.name}" created successfully`);
-        router.push("/");
-        window.location.reload();
       } catch (e: any) {
         addProgramme(payload as any);
         closeProgrammeWizard();
         localStorage.removeItem("dc_wizard_draft");
         switchProgramme(payload.id);
         alert(`✓ Programme "${payload.name}" created (Local Preview Mode)`);
-        router.push("/");
         window.location.reload();
       }
     }
@@ -490,12 +517,14 @@ export function ProgrammeWizard() {
             <button
               key={tab.s}
               disabled={wizStep < tab.s}
-              onClick={() => setWizStep(tab.s)}
+              onClick={() => { if (wizStep >= tab.s) setWizStep(tab.s); }}
               className={cn(
-                "flex-1 py-3 text-xs font-bold text-center border-b-2 cursor-pointer transition-colors",
+                "flex-1 py-3 text-xs font-bold text-center border-b-2 transition-colors",
                 wizStep === tab.s 
-                  ? "border-dc-blue text-dc-blue bg-white" 
-                  : "border-transparent text-slate-400 hover:text-slate-600 disabled:opacity-50 disabled:cursor-not-allowed"
+                  ? "border-dc-blue text-dc-blue bg-white cursor-pointer" 
+                  : wizStep >= tab.s
+                    ? "border-transparent text-slate-400 hover:text-slate-600 cursor-pointer"
+                    : "border-transparent text-slate-300 opacity-50 cursor-not-allowed"
               )}
             >
               {tab.label}
@@ -814,7 +843,7 @@ export function ProgrammeWizard() {
                   </thead>
                   <tbody>
                     {wizPhases.map((p, idx) => (
-                      <tr key={idx} className="border-b border-slate-100 hover:bg-slate-50/50">
+                      <tr key={`${p.code}-${idx}`} className="border-b border-slate-100 hover:bg-slate-50/50">
                         <td className="p-2">
                           <input 
                             type="text" 
