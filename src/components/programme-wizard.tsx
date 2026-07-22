@@ -347,7 +347,7 @@ export function ProgrammeWizard() {
         alert("Programme Name is required");
         return;
       }
-      if (wizardMode === "create" && programmes.some(p => p.id === trimmedId)) {
+      if (programmes.some(p => p.id === trimmedId && p.id !== editId)) {
         alert(`Programme ID "${trimmedId}" already exists`);
         return;
       }
@@ -523,18 +523,10 @@ export function ProgrammeWizard() {
                     type="text" 
                     placeholder="e.g., BG_AUTO_2026"
                     value={wizForm.id}
-                    disabled={wizardMode === "edit"}
                     onChange={(e) => setWizForm(prev => ({ ...prev, id: e.target.value.toUpperCase() }))}
-                    className={cn(
-                      "w-full border border-slate-200 rounded px-3 py-2 text-xs focus:outline-none focus:border-dc-blue uppercase font-bold",
-                      wizardMode === "edit" ? "bg-slate-100 text-slate-500 cursor-not-allowed border-slate-200" : ""
-                    )}
+                    className="w-full border border-slate-200 rounded px-3 py-2 text-xs focus:outline-none focus:border-dc-blue uppercase font-bold"
                   />
-                  {wizardMode === "create" ? (
-                    <span className="text-[9px] text-slate-400 block mt-0.5">UPPERCASE_NO_SPACES, alphanumeric and underscores only.</span>
-                  ) : (
-                    <span className="text-[9px] text-slate-400 block mt-0.5">Programme ID cannot be changed once created.</span>
-                  )}
+                  <span className="text-[9px] text-slate-400 block mt-0.5">UPPERCASE_NO_SPACES, alphanumeric and underscores only.</span>
                 </div>
 
                 <div>
