@@ -144,29 +144,41 @@ export default function GanttPage() {
 
   const displayWbs = (wbs: string) => {
     if (!wbs) return "";
-    const prefixed = String(wbs).match(/^[A-Za-z0-9_]+-(\d+(?:\.\d+)*)$/);
-    if (prefixed) return prefixed[1];
-    const pfx = (activeProgrammeId || "").toLowerCase() + "-";
-    if (pfx.length > 1 && String(wbs).toLowerCase().startsWith(pfx)) return String(wbs).substring(pfx.length);
-    return wbs;
+    const str = String(wbs).trim();
+    const dashIdx = str.indexOf("-");
+    if (dashIdx !== -1) return str.substring(dashIdx + 1);
+    return str;
   };
 
-  const wbsSortKey = (wbs: string): string => {
+  const wbsSortKey = (wbs: string, programmeId?: string): string => {
     if (!wbs) return '';
-    return String(wbs).split('.').map(p => {
-      const dashIdx = p.indexOf('-');
-      if (dashIdx !== -1) {
-        const prefix = p.substring(0, dashIdx + 1);
-        const num = p.substring(dashIdx + 1);
-        return prefix + num.padStart(4, '0');
+    const str = String(wbs).trim();
+    let pfx = '';
+    let numericStr = str;
+
+    const dashIdx = str.indexOf('-');
+    if (dashIdx !== -1) {
+      pfx = str.substring(0, dashIdx).toUpperCase();
+      numericStr = str.substring(dashIdx + 1);
+    } else if (programmeId || activeProgrammeId) {
+      pfx = String(programmeId || activeProgrammeId).trim().toUpperCase();
+    }
+
+    const parts = numericStr.split('.').map(p => {
+      const num = parseInt(p, 10);
+      if (!isNaN(num) && String(num) === p) {
+        return String(num).padStart(4, '0');
       }
       return p.padStart(4, '0');
-    }).join('.');
+    });
+
+    const paddedNumeric = parts.join('.');
+    return pfx ? `${pfx}-${paddedNumeric}` : paddedNumeric;
   };
 
   const wbsDescendantPrefix = (wbs: string) => {
-    const norm = displayWbs(wbs);
-    if (norm.endsWith(".0")) return norm.slice(0, -1);
+    let norm = displayWbs(wbs);
+    if (norm.endsWith(".0")) norm = norm.slice(0, -2);
     return norm + ".";
   };
 
@@ -220,7 +232,11 @@ export default function GanttPage() {
   // Sort & Collapse
   const visibleTasks = useMemo(() => {
     let list = [...filteredTasks];
-    list.sort((a, b) => (a.wbs_sort || a.wbs).localeCompare(b.wbs_sort || b.wbs, undefined, { numeric: true }));
+    list.sort((a, b) => {
+      const keyA = wbsSortKey(a.wbs, a.programme_id);
+      const keyB = wbsSortKey(b.wbs, b.programme_id);
+      return keyA.localeCompare(keyB);
+    });
 
     // Filter out descendants of collapsed parents
     list = list.filter((t) => {
@@ -231,7 +247,7 @@ export default function GanttPage() {
     });
 
     return list;
-  }, [filteredTasks, ganttCollapsed]);
+  }, [filteredTasks, ganttCollapsed, activeProgrammeId]);
 
   // Compute Timeline Start & End Weeks
   const { winStart, winEnd } = useMemo(() => {

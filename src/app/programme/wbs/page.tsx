@@ -81,30 +81,54 @@ export default function WbsPage() {
   // Helper to strip programme prefix
   const displayWbs = (wbs: string) => {
     if (!wbs) return "";
-    const prefixed = String(wbs).match(/^[A-Za-z0-9_]+-(\d+(?:\.\d+)*)$/);
-    if (prefixed) return prefixed[1];
-    const pfx = (activeProgrammeId || "").toLowerCase() + "-";
-    if (pfx.length > 1 && String(wbs).toLowerCase().startsWith(pfx)) return String(wbs).substring(pfx.length);
-    return wbs;
+    const str = String(wbs).trim();
+    const dashIdx = str.indexOf("-");
+    if (dashIdx !== -1) return str.substring(dashIdx + 1);
+    return str;
   };
 
-  const wbsSortKey = (wbs: string): string => {
+  const wbsSortKey = (wbs: string, programmeId?: string): string => {
     if (!wbs) return '';
-    return String(wbs).split('.').map(p => {
-      const dashIdx = p.indexOf('-');
-      if (dashIdx !== -1) {
-        const prefix = p.substring(0, dashIdx + 1);
-        const num = p.substring(dashIdx + 1);
-        return prefix + num.padStart(4, '0');
+    const str = String(wbs).trim();
+    let pfx = '';
+    let numericStr = str;
+
+    const dashIdx = str.indexOf('-');
+    if (dashIdx !== -1) {
+      pfx = str.substring(0, dashIdx).toUpperCase();
+      numericStr = str.substring(dashIdx + 1);
+    } else if (programmeId || activeProgrammeId) {
+      pfx = String(programmeId || activeProgrammeId).trim().toUpperCase();
+    }
+
+    const parts = numericStr.split('.').map(p => {
+      const num = parseInt(p, 10);
+      if (!isNaN(num) && String(num) === p) {
+        return String(num).padStart(4, '0');
       }
       return p.padStart(4, '0');
-    }).join('.');
+    });
+
+    const paddedNumeric = parts.join('.');
+    return pfx ? `${pfx}-${paddedNumeric}` : paddedNumeric;
+  };
+
+  const computeTaskLevel = (wbs: string): number => {
+    const norm = displayWbs(wbs);
+    if (!norm) return 1;
+    const parts = norm.split('.').filter(Boolean);
+    if (parts.length <= 1) return 1;
+    if (parts.length === 2) {
+      if (parts[1] === '0') return 1;
+      return 2;
+    }
+    return 3;
   };
 
   // Support N.0 parent conventions for descendant selection
   const wbsDescendantPrefix = (wbs: string) => {
-    const norm = displayWbs(wbs);
-    if (norm.endsWith(".0")) return norm.slice(0, -1);
+    let norm = displayWbs(wbs);
+    if (norm.endsWith(".0")) norm = norm.slice(0, -2);
     return norm + ".";
   };
 
@@ -299,8 +323,8 @@ export default function WbsPage() {
     
     if (groupBy === "hierarchy") {
       list.sort((a, b) => {
-        const keyA = wbsSortKey(a.wbs_sort || a.wbs);
-        const keyB = wbsSortKey(b.wbs_sort || b.wbs);
+        const keyA = wbsSortKey(a.wbs, a.programme_id);
+        const keyB = wbsSortKey(b.wbs, b.programme_id);
         return keyA.localeCompare(keyB);
       });
       // Filter out children of collapsed parents
@@ -313,7 +337,7 @@ export default function WbsPage() {
     }
     
     return list;
-  }, [filteredTasks, groupBy, collapsedWbs]);
+  }, [filteredTasks, groupBy, collapsedWbs, activeProgrammeId]);
 
   // Grouped task items (for non-hierarchical views)
   const groupedCategories = useMemo(() => {
@@ -381,10 +405,8 @@ export default function WbsPage() {
       finalWbs = `${activeProgrammeId}-${finalWbs}`;
     }
 
-    // Detect level from dots on the suffix WBS hierarchy part
-    const suffixPart = finalWbs.substring(activeProgrammeId.length + 1);
-    const dots = (suffixPart.match(/\./g) || []).length;
-    const computedLevel = dots === 0 ? 1 : (dots === 1 ? 2 : 3);
+    const computedLevel = computeTaskLevel(finalWbs);
+    const calculatedSort = wbsSortKey(finalWbs, activeProgrammeId);
 
     const taskPayload: Task = {
       wbs: finalWbs,
@@ -404,7 +426,7 @@ export default function WbsPage() {
       percent_complete: formPercent,
       approval_status: formApproval === "—" ? "NOT_REQUIRED" : formApproval,
       level: computedLevel,
-      wbs_sort: finalWbs,
+      wbs_sort: calculatedSort,
       start_wk: formStartWk,
       finish_wk: formFinishWk,
       cost_inr: formPlanHr * 1500
