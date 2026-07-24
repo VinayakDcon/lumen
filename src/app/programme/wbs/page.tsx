@@ -87,20 +87,9 @@ export default function WbsPage() {
     return str;
   };
 
-  const wbsSortKey = (wbs: string, programmeId?: string): string => {
+  const wbsSortKey = (wbs: string): string => {
     if (!wbs) return '';
-    const str = String(wbs).trim();
-    let pfx = '';
-    let numericStr = str;
-
-    const dashIdx = str.indexOf('-');
-    if (dashIdx !== -1) {
-      pfx = str.substring(0, dashIdx).toUpperCase();
-      numericStr = str.substring(dashIdx + 1);
-    } else if (programmeId || activeProgrammeId) {
-      pfx = String(programmeId || activeProgrammeId).trim().toUpperCase();
-    }
-
+    const numericStr = displayWbs(wbs);
     const parts = numericStr.split('.').map(p => {
       const num = parseInt(p, 10);
       if (!isNaN(num) && String(num) === p) {
@@ -108,21 +97,16 @@ export default function WbsPage() {
       }
       return p.padStart(4, '0');
     });
-
-    const paddedNumeric = parts.join('.');
-    return pfx ? `${pfx}-${paddedNumeric}` : paddedNumeric;
+    return parts.join('.');
   };
 
   const computeTaskLevel = (wbs: string): number => {
     const norm = displayWbs(wbs);
     if (!norm) return 1;
     const parts = norm.split('.').filter(Boolean);
-    if (parts.length <= 1) return 1;
-    if (parts.length === 2) {
-      if (parts[1] === '0') return 1;
-      return 2;
-    }
-    return 3;
+    let computedLevel = parts.length;
+    if (norm.endsWith('.0')) computedLevel -= 1;
+    return Math.max(1, Math.min(3, computedLevel));
   };
 
   // Support N.0 parent conventions for descendant selection
@@ -324,8 +308,8 @@ export default function WbsPage() {
     
     if (groupBy === "hierarchy") {
       list.sort((a, b) => {
-        const keyA = wbsSortKey(a.wbs, a.programme_id);
-        const keyB = wbsSortKey(b.wbs, b.programme_id);
+        const keyA = wbsSortKey(a.wbs);
+        const keyB = wbsSortKey(b.wbs);
         return keyA.localeCompare(keyB);
       });
       // Filter out children of collapsed parents
@@ -407,7 +391,7 @@ export default function WbsPage() {
     }
 
     const computedLevel = computeTaskLevel(finalWbs);
-    const calculatedSort = wbsSortKey(finalWbs, activeProgrammeId);
+    const calculatedSort = wbsSortKey(finalWbs);
 
     const taskPayload: Task = {
       wbs: finalWbs,
