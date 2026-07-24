@@ -157,7 +157,8 @@ export default function WbsPage() {
 
   // Roll-up logic for parent tasks
   const rollupTaskInfo = (t: Task) => {
-    if (t.level === 3) {
+    const level = computeTaskLevel(t.wbs);
+    if (level === 3) {
       const status = normaliseTaskStatus(t.status, t.percent_complete);
       const percent = status === "DONE" ? 100 : (t.percent_complete || 0);
       return {
@@ -172,14 +173,14 @@ export default function WbsPage() {
     }
 
     // Find all Level 3 descendants
-    const descendants = rawTasks.filter(o => o.level === 3 && isDescendantOf(o.wbs, t.wbs));
+    const descendants = rawTasks.filter(o => computeTaskLevel(o.wbs) === 3 && isDescendantOf(o.wbs, t.wbs));
     
     // Sum of Level 2 children effort for Level 1, or own effort for Level 2
     let plan_hr = 0;
-    if (t.level === 1) {
-      const l2Children = rawTasks.filter(o => o.level === 2 && isDescendantOf(o.wbs, t.wbs));
+    if (level === 1) {
+      const l2Children = rawTasks.filter(o => computeTaskLevel(o.wbs) === 2 && isDescendantOf(o.wbs, t.wbs));
       plan_hr = l2Children.reduce((sum, c) => sum + (c.effort_hr || c.plan_hr || 0), 0);
-    } else if (t.level === 2) {
+    } else if (level === 2) {
       plan_hr = t.effort_hr || t.plan_hr || 0;
     }
 
@@ -256,9 +257,9 @@ export default function WbsPage() {
 
       // 2. Phase filter
       if (filterPhase) {
-        if (t.level === 3 && t.phase !== filterPhase) return false;
-        if (t.level !== 3) {
-          const hasMatchingChild = rawTasks.some(o => o.level === 3 && isDescendantOf(o.wbs, t.wbs) && o.phase === filterPhase);
+        if (computeTaskLevel(t.wbs) === 3 && t.phase !== filterPhase) return false;
+        if (computeTaskLevel(t.wbs) !== 3) {
+          const hasMatchingChild = rawTasks.some(o => computeTaskLevel(o.wbs) === 3 && isDescendantOf(o.wbs, t.wbs) && o.phase === filterPhase);
           if (!hasMatchingChild) return false;
         }
       }
@@ -269,9 +270,9 @@ export default function WbsPage() {
           const arr = partVal.split(",").map(s => s.trim());
           return arr.includes("ALL") || arr.includes(filterPart);
         };
-        if (t.level === 3 && !checkPart(t.part || "ALL")) return false;
-        if (t.level !== 3) {
-          const hasMatchingChild = rawTasks.some(o => o.level === 3 && isDescendantOf(o.wbs, t.wbs) && checkPart(o.part || "ALL"));
+        if (computeTaskLevel(t.wbs) === 3 && !checkPart(t.part || "ALL")) return false;
+        if (computeTaskLevel(t.wbs) !== 3) {
+          const hasMatchingChild = rawTasks.some(o => computeTaskLevel(o.wbs) === 3 && isDescendantOf(o.wbs, t.wbs) && checkPart(o.part || "ALL"));
           if (!hasMatchingChild) return false;
         }
       }
@@ -281,9 +282,9 @@ export default function WbsPage() {
         const checkDisc = (discVal: string) => {
           return discVal.toLowerCase() === filterDisc.toLowerCase();
         };
-        if (t.level === 3 && !checkDisc(t.discipline || "PM")) return false;
-        if (t.level !== 3) {
-          const hasMatchingChild = rawTasks.some(o => o.level === 3 && isDescendantOf(o.wbs, t.wbs) && checkDisc(o.discipline || "PM"));
+        if (computeTaskLevel(t.wbs) === 3 && !checkDisc(t.discipline || "PM")) return false;
+        if (computeTaskLevel(t.wbs) !== 3) {
+          const hasMatchingChild = rawTasks.some(o => computeTaskLevel(o.wbs) === 3 && isDescendantOf(o.wbs, t.wbs) && checkDisc(o.discipline || "PM"));
           if (!hasMatchingChild) return false;
         }
       }
@@ -312,7 +313,7 @@ export default function WbsPage() {
   };
 
   const collapseAll = () => {
-    const parentWbs = rawTasks.filter(t => (t.level || 3) < 3).map(t => t.wbs);
+    const parentWbs = rawTasks.filter(t => computeTaskLevel(t.wbs) < 3).map(t => t.wbs);
     setCollapsedWbs(parentWbs);
   };
 
@@ -345,7 +346,7 @@ export default function WbsPage() {
     
     const map: Record<string, Task[]> = {};
     // Only group leaf (level 3) tasks
-    const leaves = filteredTasks.filter(t => t.level === 3);
+    const leaves = filteredTasks.filter(t => computeTaskLevel(t.wbs) === 3);
     
     leaves.forEach(t => {
       let key = "—";
@@ -362,7 +363,7 @@ export default function WbsPage() {
 
   // Cost estimation helper
   const getCost = (t: Task, rolledPlanHr: number) => {
-    if (t.level === 3) {
+    if (computeTaskLevel(t.wbs) === 3) {
       const firstRes = (t.resources || '').split(',')[0].trim();
       if (!firstRes || firstRes === '—') return 0;
       const r = mockResources.find(res => 
@@ -376,7 +377,7 @@ export default function WbsPage() {
       return (t.effort_hr || t.plan_hr || 0) * rate;
     } else {
       // For parent levels, sum the cost of Level 3 descendants
-      const descendants = rawTasks.filter(o => o.level === 3 && isDescendantOf(o.wbs, t.wbs));
+      const descendants = rawTasks.filter(o => computeTaskLevel(o.wbs) === 3 && isDescendantOf(o.wbs, t.wbs));
       return descendants.reduce((sum, d) => {
         const firstRes = (d.resources || '').split(',')[0].trim();
         if (!firstRes || firstRes === '—') return sum;
@@ -609,8 +610,9 @@ export default function WbsPage() {
 
   // Unified row renderer
   const renderTaskRow = (t: Task, isGroupedView = false) => {
+    const taskLevel = computeTaskLevel(t.wbs);
     const rolled = rollupTaskInfo(t);
-    const hasChildren = (t.level || 3) < 3 && rawTasks.some(o => (o.level || 3) === 3 && isDescendantOf(o.wbs, t.wbs));
+    const hasChildren = taskLevel < 3 && rawTasks.some(o => computeTaskLevel(o.wbs) === 3 && isDescendantOf(o.wbs, t.wbs));
     const isCollapsed = collapsedWbs.includes(t.wbs);
     const totalCost = getCost(t, rolled.plan_hr);
 
@@ -629,7 +631,7 @@ export default function WbsPage() {
     let docLinkClass = "";
     let docBubbleClass = "";
 
-    if ((t.level || 3) === 1) {
+    if (taskLevel === 1) {
       rowBgClass = "bg-[#0D1B2E] dark:bg-[#1F2937] text-[#C9A95A] dark:text-[#C9A95A] font-bold border-b border-slate-800/60 dark:border-slate-800/60";
       nameIndentClass = "pl-2 font-bold text-[#C9A95A]";
       wbsTextClass = "text-[#C9A95A] font-bold";
@@ -643,7 +645,7 @@ export default function WbsPage() {
       uploadBtnClass = "bg-white/10 hover:bg-white/20 text-[#C9A95A] border border-[#C9A95A]/40 hover:border-[#C9A95A]";
       docLinkClass = "text-white hover:underline font-semibold";
       docBubbleClass = "bg-white/10 border border-white/20 text-[#C9A95A]";
-    } else if ((t.level || 3) === 2) {
+    } else if (taskLevel === 2) {
       rowBgClass = "bg-[#E8F2FC] dark:bg-[#0F172A] text-[#0D1B2E] dark:text-slate-200 font-bold border-b border-slate-200 dark:border-slate-800";
       nameIndentClass = "pl-6 font-bold text-[#0D1B2E] dark:text-slate-200";
       wbsTextClass = "text-[#0D1B2E] dark:text-slate-200 font-bold";
@@ -725,7 +727,7 @@ export default function WbsPage() {
 
         {/* Planned Hours */}
         <td className={cn("py-2 px-2 text-center", planHrTextClass)}>
-          {t.level === 3 ? "—" : (rolled.plan_hr || "—")}
+          {taskLevel === 3 ? "—" : (rolled.plan_hr || "—")}
         </td>
 
         {/* Actual Hours */}
