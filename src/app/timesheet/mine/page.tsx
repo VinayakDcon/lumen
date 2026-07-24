@@ -221,21 +221,114 @@ export default function MyTimesheetPage() {
   const [showLeaveCal,  setShowLeaveCal]  = useState(false);
   const [leaveCalMonth, setLeaveCalMonth] = useState<Date>(() => new Date());
 
+  const personId = user?.person_id || "person-2";
+
   // Leave days: Set of YYYY-MM-DD strings
-  const [leaveDays, setLeaveDays] = useState<Set<string>>(new Set());
+  const [leaveDays, setLeaveDays] = useState<Set<string>>(() => {
+    if (typeof window === "undefined") return new Set();
+    try {
+      const saved = localStorage.getItem(`dcon_leave_days_${personId}`);
+      if (saved) return new Set(JSON.parse(saved));
+    } catch (e) {}
+    return new Set();
+  });
+
+  // WFH days: Set of YYYY-MM-DD strings
+  const [wfhDays, setWfhDays] = useState<Set<string>>(() => {
+    if (typeof window === "undefined") return new Set();
+    try {
+      const saved = localStorage.getItem(`dcon_wfh_days_${personId}`);
+      if (saved) return new Set(JSON.parse(saved));
+    } catch (e) {}
+    return new Set();
+  });
 
   const [showWfhCal,  setShowWfhCal]  = useState(false);
   const [wfhCalMonth, setWfhCalMonth] = useState<Date>(() => new Date());
-
-  // WFH days: Set of YYYY-MM-DD strings
-  const [wfhDays, setWfhDays] = useState<Set<string>>(new Set());
 
   const [showHalfDayCal,  setShowHalfDayCal]  = useState(false);
   const [halfDayCalMonth, setHalfDayCalMonth] = useState<Date>(() => new Date());
   const [pendingHalfDayDate, setPendingHalfDayDate] = useState<string | null>(null);
 
   // Half day leaves: Map YYYY-MM-DD -> 'first' | 'second'
-  const [halfDays, setHalfDays] = useState<Map<string, "first" | "second">>(new Map());
+  const [halfDays, setHalfDays] = useState<Map<string, "first" | "second">>(() => {
+    if (typeof window === "undefined") return new Map();
+    try {
+      const saved = localStorage.getItem(`dcon_half_days_${personId}`);
+      if (saved) return new Map(Object.entries(JSON.parse(saved)));
+    } catch (e) {}
+    return new Map();
+  });
+
+  // Hydrate attendance from Backend API on mount & personId change
+  useEffect(() => {
+    if (!personId) return;
+    let isMounted = true;
+
+    try {
+      const sLeave = localStorage.getItem(`dcon_leave_days_${personId}`);
+      const sWfh = localStorage.getItem(`dcon_wfh_days_${personId}`);
+      const sHalf = localStorage.getItem(`dcon_half_days_${personId}`);
+      if (sLeave && isMounted) setLeaveDays(new Set(JSON.parse(sLeave)));
+      if (sWfh && isMounted) setWfhDays(new Set(JSON.parse(sWfh)));
+      if (sHalf && isMounted) setHalfDays(new Map(Object.entries(JSON.parse(sHalf))));
+    } catch (e) {}
+
+    fetch(`/api-proxy/time/attendance?person_id=${encodeURIComponent(personId)}`)
+      .then(res => res.ok ? res.json() : null)
+      .then(data => {
+        if (!data || !isMounted) return;
+        if (Array.isArray(data.leaveDays)) {
+          const s = new Set<string>(data.leaveDays);
+          setLeaveDays(s);
+          try { localStorage.setItem(`dcon_leave_days_${personId}`, JSON.stringify(Array.from(s))); } catch (e) {}
+        }
+        if (Array.isArray(data.wfhDays)) {
+          const s = new Set<string>(data.wfhDays);
+          setWfhDays(s);
+          try { localStorage.setItem(`dcon_wfh_days_${personId}`, JSON.stringify(Array.from(s))); } catch (e) {}
+        }
+        if (data.halfDays && typeof data.halfDays === "object") {
+          const m = new Map<string, "first" | "second">(Object.entries(data.halfDays));
+          setHalfDays(m);
+          try { localStorage.setItem(`dcon_half_days_${personId}`, JSON.stringify(Object.fromEntries(m))); } catch (e) {}
+        }
+      })
+      .catch(err => console.error("Error fetching attendance logs:", err));
+
+    return () => { isMounted = false; };
+  }, [personId]);
+
+  // Sync state changes to localStorage and Backend API
+  const isInitialMount = useRef(true);
+  useEffect(() => {
+    if (isInitialMount.current) {
+      isInitialMount.current = false;
+      return;
+    }
+    if (!personId) return;
+
+    const leaveArr = Array.from(leaveDays);
+    const wfhArr = Array.from(wfhDays);
+    const halfObj = Object.fromEntries(halfDays);
+
+    try {
+      localStorage.setItem(`dcon_leave_days_${personId}`, JSON.stringify(leaveArr));
+      localStorage.setItem(`dcon_wfh_days_${personId}`, JSON.stringify(wfhArr));
+      localStorage.setItem(`dcon_half_days_${personId}`, JSON.stringify(halfObj));
+    } catch (e) {}
+
+    fetch("/api-proxy/time/attendance", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        person_id: personId,
+        leaveDays: leaveArr,
+        wfhDays: wfhArr,
+        halfDays: halfObj
+      })
+    }).catch(err => console.error("Error persisting attendance logs:", err));
+  }, [leaveDays, wfhDays, halfDays, personId]);
 
   // Refs for click-outside dismissal
   const weekCalRef     = useRef<HTMLDivElement>(null);
@@ -301,7 +394,6 @@ export default function MyTimesheetPage() {
     }])
   ];
 
-  const personId  = user?.person_id || "person-2";
   const submission = submissions.find(
     s => (String(s.person_id) === String(personId) || String(s.person_id) === String(personId).replace("person-", "")) && s.week_start_date === weekStartStr
   );

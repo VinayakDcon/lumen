@@ -2186,9 +2186,13 @@ export const usePmoStore = create<PmoState>((set, get) => ({
         set((state) => ({
           timeEntries: [...state.timeEntries.filter(e => e.id !== newEntry.id), newEntry]
         }));
+      } else {
+        const err = await res.json().catch(() => ({}));
+        alert(err.error || "Failed to add time entry.");
       }
     } catch (e) {
       console.error("Failed to add time entry on backend", e);
+      alert("Failed to add time entry. Network/Proxy error.");
     }
   },
   deleteTimeEntry: async (id) => {
@@ -2217,15 +2221,19 @@ export const usePmoStore = create<PmoState>((set, get) => ({
         set((state) => ({
           timeEntries: state.timeEntries.map(e => e.id === id ? updatedEntry : e)
         }));
+      } else {
+        const err = await res.json().catch(() => ({}));
+        alert(err.error || "Failed to update time entry.");
       }
     } catch (e) {
       console.error("Failed to update time entry on backend", e);
+      alert("Failed to update time entry. Network/Proxy error.");
     }
   },
   setTimeEntries: (timeEntries) => set({ timeEntries }),
   submitTimesheetWeek: async (personId, weekStart) => {
     try {
-      const cleanPersonId = typeof personId === 'string' ? parseInt(personId.replace('person-', '')) : personId;
+      const cleanPersonId = typeof personId === 'string' && !isNaN(parseInt(personId.replace('person-', ''))) ? parseInt(personId.replace('person-', '')) : personId;
       const res = await fetch("/api-proxy/my/timesheet/submit", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -2244,9 +2252,13 @@ export const usePmoStore = create<PmoState>((set, get) => ({
             { ...sub, person_id: String(personId).startsWith('person-') ? personId : `person-${sub.person_id}` }
           ]
         }));
+      } else {
+        const err = await res.json().catch(() => ({}));
+        alert(err.error || "Failed to submit timesheet week.");
       }
     } catch (e) {
       console.error("Failed to submit timesheet week", e);
+      alert("Failed to submit timesheet week. Network/Proxy error.");
     }
   },
   approveTimesheetSubmission: async (id, approvedBy) => {

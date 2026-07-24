@@ -160,6 +160,8 @@ export function useEvmReportQuery(id: string, week?: number) {
           ...t,
           blocked_hr: t.blocked_hr !== undefined ? t.blocked_hr : (t.blocked_hours || 0)
         }));
+      }
+      if (normalized) {
         setTasks(normalized, id);
       }
       return getEvmReport(id, week);
@@ -186,6 +188,8 @@ export function useHeatmapReportQuery(id: string) {
           ...t,
           blocked_hr: t.blocked_hr !== undefined ? t.blocked_hr : (t.blocked_hours || 0)
         }));
+      }
+      if (normalized) {
         setTasks(normalized, id);
       }
       return getHeatmapReport(id);

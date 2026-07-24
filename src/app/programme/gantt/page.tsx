@@ -142,16 +142,6 @@ export default function GanttPage() {
 
   const disciplines = ["PM", "Optics", "Mechanical", "Electrical", "Manufacturing", "Test/Quality", "Homologation", "Software"];
 
-  const wbsDescendantPrefix = (wbs: string) => {
-    if (wbs.endsWith(".0")) return wbs.slice(0, -1);
-    return wbs + ".";
-  };
-
-  const isDescendantOf = (childWbs: string, parentWbs: string) => {
-    if (childWbs === parentWbs) return false;
-    return childWbs.startsWith(wbsDescendantPrefix(parentWbs));
-  };
-
   const displayWbs = (wbs: string) => {
     if (!wbs) return "";
     const prefixed = String(wbs).match(/^[A-Za-z0-9_]+-(\d+(?:\.\d+)*)$/);
@@ -161,13 +151,38 @@ export default function GanttPage() {
     return wbs;
   };
 
+  const wbsSortKey = (wbs: string): string => {
+    if (!wbs) return '';
+    return String(wbs).split('.').map(p => {
+      const dashIdx = p.indexOf('-');
+      if (dashIdx !== -1) {
+        const prefix = p.substring(0, dashIdx + 1);
+        const num = p.substring(dashIdx + 1);
+        return prefix + num.padStart(4, '0');
+      }
+      return p.padStart(4, '0');
+    }).join('.');
+  };
+
+  const wbsDescendantPrefix = (wbs: string) => {
+    const norm = displayWbs(wbs);
+    if (norm.endsWith(".0")) return norm.slice(0, -1);
+    return norm + ".";
+  };
+
+  const isDescendantOf = (childWbs: string, parentWbs: string) => {
+    const childNorm = displayWbs(childWbs);
+    const parentNorm = displayWbs(parentWbs);
+    if (childNorm === parentNorm) return false;
+    return childNorm.startsWith(wbsDescendantPrefix(parentNorm));
+  };
+
   // Pre-computes filter matching for Level 3 items
   const matchesL3 = (t: Task) => {
-    if (discFilter && !(t.discipline || "").split(",").map((s) => s.trim()).includes(discFilter)) return false;
-    if (resFilter) {
-      const res = (t.resources || "").split(",").map((s) => s.trim());
-      if (!res.includes(resFilter)) return false;
-    }
+    if (phaseFilter && t.phase !== phaseFilter) return false;
+    if (partFilter && t.part !== partFilter) return false;
+    if (discFilter && t.discipline !== discFilter) return false;
+    if (resFilter && !(t.resources || "").toLowerCase().includes(resFilter.toLowerCase())) return false;
     return true;
   };
 

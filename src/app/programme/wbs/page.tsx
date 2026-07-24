@@ -88,15 +88,31 @@ export default function WbsPage() {
     return wbs;
   };
 
+  const wbsSortKey = (wbs: string): string => {
+    if (!wbs) return '';
+    return String(wbs).split('.').map(p => {
+      const dashIdx = p.indexOf('-');
+      if (dashIdx !== -1) {
+        const prefix = p.substring(0, dashIdx + 1);
+        const num = p.substring(dashIdx + 1);
+        return prefix + num.padStart(4, '0');
+      }
+      return p.padStart(4, '0');
+    }).join('.');
+  };
+
   // Support N.0 parent conventions for descendant selection
   const wbsDescendantPrefix = (wbs: string) => {
-    if (wbs.endsWith(".0")) return wbs.slice(0, -1);
-    return wbs + ".";
+    const norm = displayWbs(wbs);
+    if (norm.endsWith(".0")) return norm.slice(0, -1);
+    return norm + ".";
   };
 
   const isDescendantOf = (childWbs: string, parentWbs: string) => {
-    if (childWbs === parentWbs) return false;
-    return childWbs.startsWith(wbsDescendantPrefix(parentWbs));
+    const childNorm = displayWbs(childWbs);
+    const parentNorm = displayWbs(parentWbs);
+    if (childNorm === parentNorm) return false;
+    return childNorm.startsWith(wbsDescendantPrefix(parentNorm));
   };
 
   const normaliseTaskStatus = (status: string, percentComplete = 0) => {
@@ -282,7 +298,11 @@ export default function WbsPage() {
     let list = [...filteredTasks];
     
     if (groupBy === "hierarchy") {
-      list.sort((a, b) => (a.wbs_sort || a.wbs).localeCompare(b.wbs_sort || b.wbs, undefined, { numeric: true }));
+      list.sort((a, b) => {
+        const keyA = wbsSortKey(a.wbs_sort || a.wbs);
+        const keyB = wbsSortKey(b.wbs_sort || b.wbs);
+        return keyA.localeCompare(keyB);
+      });
       // Filter out children of collapsed parents
       list = list.filter(t => {
         for (const p of collapsedWbs) {
