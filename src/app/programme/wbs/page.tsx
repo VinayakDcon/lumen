@@ -497,38 +497,62 @@ export default function WbsPage() {
   };
 
   // Step 1: File Upload -> Preview API Call
+  const handleProcessFile = async (file: File) => {
+    setImportFile(file);
+    setIsUploading(true);
+
+    try {
+      const base64String = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.readAsDataURL(file);
+        reader.onload = () => {
+          const result = reader.result as string;
+          resolve(result.split(",")[1]);
+        };
+        reader.onerror = error => reject(error);
+      });
+
+      const res = await fetch("/api-proxy/tasks/import-wbs/preview", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          fileBase64: base64String,
+          filename: file.name,
+          programme_id: activeProgrammeId
+        }),
+      });
+
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || "Preview failed");
+      }
+
+      const data = await res.json();
+      setImportPreview(data);
+      setImportStep(2);
+    } catch (err: any) {
+      console.error(err);
+      alert(err.message || "Failed to parse import file. Check header fields.");
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
-      const file = e.target.files[0];
-      setImportFile(file);
-      setIsUploading(true);
-
-      const formData = new FormData();
-      formData.append("file", file);
-      formData.append("programme_id", activeProgrammeId);
-
-      try {
-        const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
-        const res = await fetch(`${apiUrl}/api/tasks/import-wbs/preview`, {
-          method: "POST",
-          body: formData,
-        });
-
-        if (!res.ok) {
-          const err = await res.json();
-          throw new Error(err.error || "Preview failed");
-        }
-
-        const data = await res.json();
-        setImportPreview(data);
-        setImportStep(2);
-      } catch (err: any) {
-        console.error(err);
-        alert(err.message || "Failed to parse import file. Check header fields.");
-      } finally {
-        setIsUploading(false);
-      }
+      handleProcessFile(e.target.files[0]);
     }
+  };
+
+  const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+      handleProcessFile(e.dataTransfer.files[0]);
+    }
+  };
+
+  const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
   };
 
   // Step 2: Confirm -> Commit API Call
@@ -543,8 +567,7 @@ export default function WbsPage() {
     }
 
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
-      const res = await fetch(`${apiUrl}/api/tasks/import-wbs/confirm`, {
+      const res = await fetch("/api-proxy/tasks/import-wbs/confirm", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -1475,7 +1498,11 @@ export default function WbsPage() {
               {/* STEP 1: UPLOAD */}
               {importStep === 1 && (
                 <div className="space-y-4">
-                  <div className="border-2 border-dashed border-slate-300 hover:border-dc-blue rounded-xl p-8 text-center bg-slate-50/50 hover:bg-slate-50 transition-all flex flex-col items-center justify-center gap-3 group relative cursor-pointer">
+                  <div 
+                    className="border-2 border-dashed border-slate-300 hover:border-dc-blue rounded-xl p-8 text-center bg-slate-50/50 hover:bg-slate-50 transition-all flex flex-col items-center justify-center gap-3 group relative cursor-pointer"
+                    onDrop={handleDrop}
+                    onDragOver={handleDragOver}
+                  >
                     <input 
                       type="file" 
                       accept=".xlsx,.xls,.csv"
