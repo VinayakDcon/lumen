@@ -37,7 +37,11 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
 
       try {
         const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
-        const res = await fetch(`${apiUrl}/api/me?email=${encodeURIComponent(email)}`);
+        const res = await fetch(`${apiUrl}/api/me?email=${encodeURIComponent(email)}`, {
+          headers: {
+            "x-api-key": "dcon-life-os-2026"
+          }
+        });
         if (!res.ok) {
           console.warn(`[Auth] Sign-in rejected for ${email}: Backend responded with status ${res.status}`);
           return false;
