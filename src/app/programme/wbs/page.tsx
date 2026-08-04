@@ -508,7 +508,8 @@ export default function WbsPage() {
       formData.append("programme_id", activeProgrammeId);
 
       try {
-        const res = await fetch("/api-proxy/tasks/import-wbs/preview", {
+        const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
+        const res = await fetch(`${apiUrl}/api/tasks/import-wbs/preview`, {
           method: "POST",
           body: formData,
         });
@@ -542,7 +543,8 @@ export default function WbsPage() {
     }
 
     try {
-      const res = await fetch("/api-proxy/tasks/import-wbs/confirm", {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
+      const res = await fetch(`${apiUrl}/api/tasks/import-wbs/confirm`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
