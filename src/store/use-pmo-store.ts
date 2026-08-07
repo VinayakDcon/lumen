@@ -682,6 +682,9 @@ interface PmoState {
   updateTask: (wbs: string, updates: Partial<Task>) => void;
   deleteTask: (wbs: string) => void;
   setTasks: (tasks: Task[], pid: string) => void;
+  setDecisions: (decisions: Decision[], progId?: string) => void;
+  setMeetings: (meetings: Meeting[], progId?: string) => void;
+  setEmails: (emails: EmailQueueItem[], progId?: string) => void;
   getEvmReport: (pid: string, week?: number) => EvmReport;
   getHeatmapReport: (pid: string) => HeatmapReport;
 
@@ -720,9 +723,9 @@ interface PmoState {
   deleteDecision: (id: number) => void;
 
   // Meeting Minutes
-  addMeeting: (m: Omit<Meeting, 'id' | 'created_at'>) => void;
-  updateMeeting: (id: number, updates: Partial<Meeting>) => void;
-  deleteMeeting: (id: number) => void;
+  addMeeting: (m: Omit<Meeting, 'id' | 'created_at'>) => Promise<void>;
+  updateMeeting: (id: number, updates: Partial<Meeting>) => Promise<void>;
+  deleteMeeting: (id: number) => Promise<void>;
 
   // Email Queue
   addEmailQueueItem: (eq: Omit<EmailQueueItem, 'id' | 'from_email' | 'queued_by' | 'queued_at' | 'sent_at' | 'status' | 'error_msg'>) => void;
@@ -1578,6 +1581,9 @@ export const usePmoStore = create<PmoState>((set, get) => ({
 
   setUser: (user) => set({ user }),
   setAssignedProgrammeIds: (assignedProgrammeIds) => set({ assignedProgrammeIds }),
+  setDecisions: (decisions, progId) => set({ decisions }),
+  setMeetings: (meetings, progId) => set({ meetings }),
+  setEmails: (emails, progId) => set({ emails }),
   setProgrammes: (programmes) => set({ programmes }),
   setPeople: (people) => set({ people }),
   addProgramme: (prog) => set((state) => ({ programmes: [...state.programmes, prog] })),
@@ -2804,22 +2810,51 @@ export const usePmoStore = create<PmoState>((set, get) => ({
   })),
 
   // Meeting Minutes
-  addMeeting: (m) => set((state) => {
-    const nextId = state.meetings.length > 0 ? Math.max(...state.meetings.map(x => x.id)) + 1 : 1;
-    const newM: Meeting = {
-      ...m,
-      id: nextId,
-      created_at: new Date().toISOString().replace('T', ' ').substring(0, 19)
-    };
-    return { meetings: [...state.meetings, newM] };
-  }),
-  updateMeeting: (id, updates) => set((state) => ({
-    meetings: state.meetings.map(m => m.id === id ? { ...m, ...updates } : m)
-  })),
-  deleteMeeting: (id) => set((state) => ({
-    meetings: state.meetings.filter(m => m.id !== id)
-  })),
-
+  addMeeting: async (m) => {
+    try {
+      const res = await fetch("/api-proxy/records/meetings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(m)
+      });
+      if (res.ok) {
+        const newM = await res.json();
+        set((state) => ({ meetings: [...state.meetings, newM] }));
+      }
+    } catch (e) {
+      console.error("Failed to add meeting", e);
+    }
+  },
+  updateMeeting: async (id, updates) => {
+    try {
+      const res = await fetch(`/api-proxy/records/meetings/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(updates)
+      });
+      if (res.ok) {
+        set((state) => ({
+          meetings: state.meetings.map(m => m.id === id ? { ...m, ...updates } : m)
+        }));
+      }
+    } catch (e) {
+      console.error("Failed to update meeting", e);
+    }
+  },
+  deleteMeeting: async (id) => {
+    try {
+      const res = await fetch(`/api-proxy/records/meetings/${id}`, {
+        method: "DELETE"
+      });
+      if (res.ok) {
+        set((state) => ({
+          meetings: state.meetings.filter(m => m.id !== id)
+        }));
+      }
+    } catch (e) {
+      console.error("Failed to delete meeting", e);
+    }
+  },
   // Email Queue
   addEmailQueueItem: (eq) => set((state) => {
     const nextId = state.emails.length > 0 ? Math.max(...state.emails.map(x => x.id)) + 1 : 1;

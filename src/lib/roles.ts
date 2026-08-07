@@ -116,7 +116,7 @@ const ROLE_TABS: Record<string, string[] | typeof ALL_TABS> = {
     "programmes",
     "dashboard", "wbs", "gantt", "kanban",
     "deliverables", "milestones", "risks", "dfmea",
-    "documents", "standards", "lab",
+    "documents", "standards", "lab", "meetings",
     "skills", "resources",
     "my-timesheet", "timesheet", "resource-utilization", "hours-analytics", "roadmaps",
   ],

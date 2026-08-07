@@ -8,12 +8,15 @@ import {
 } from "lucide-react";
 import { cn } from "@/utils/cn";
 import { Meeting } from "@/types/pmo";
+import { useQueryClient } from "@tanstack/react-query";
 
 export default function MeetingsPage() {
   const activeProgrammeId = usePmoStore((state) => state.activeProgrammeId);
   const addMeeting = usePmoStore((state) => state.addMeeting);
   const updateMeeting = usePmoStore((state) => state.updateMeeting);
   const deleteMeeting = usePmoStore((state) => state.deleteMeeting);
+
+  const queryClient = useQueryClient();
 
   const { data: activeProgramme, isLoading: isProgLoading } = useActiveProgrammeQuery(activeProgrammeId);
   const { data: meetings = [], isLoading: isMtgLoading } = useMeetingsQuery(activeProgrammeId);
@@ -91,7 +94,7 @@ export default function MeetingsPage() {
     setIsModalOpen(true);
   };
 
-  const handleFormSubmit = (e: React.FormEvent) => {
+  const handleFormSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formTitle.trim() || !formDate) {
       alert("Please fill in Meeting Date and Title.");
@@ -112,16 +115,19 @@ export default function MeetingsPage() {
     };
 
     if (editingMtg) {
-      updateMeeting(editingMtg.id, payload);
+      await updateMeeting(editingMtg.id, payload);
     } else {
-      addMeeting(payload);
+      await addMeeting(payload);
     }
+    
+    queryClient.invalidateQueries({ queryKey: ["meetings", activeProgrammeId] });
     setIsModalOpen(false);
   };
 
-  const handleDeleteMtg = (id: number) => {
+  const handleDeleteMtg = async (id: number) => {
     if (confirm("Are you sure you want to delete this meeting registry entry?")) {
-      deleteMeeting(id);
+      await deleteMeeting(id);
+      queryClient.invalidateQueries({ queryKey: ["meetings", activeProgrammeId] });
       if (selectedMtgId === id) {
         setSelectedMtgId(null);
       }
