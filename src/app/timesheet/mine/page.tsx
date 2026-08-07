@@ -223,25 +223,11 @@ export default function MyTimesheetPage() {
 
   const personId = user?.person_id || "person-2";
 
-  // Leave days: Set of YYYY-MM-DD strings
-  const [leaveDays, setLeaveDays] = useState<Set<string>>(() => {
-    if (typeof window === "undefined") return new Set();
-    try {
-      const saved = localStorage.getItem(`dcon_leave_days_${personId}`);
-      if (saved) return new Set(JSON.parse(saved));
-    } catch (e) {}
-    return new Set();
-  });
+  // Leave days: Set of YYYY-MM-DD strings (Hydrated from backend DB)
+  const [leaveDays, setLeaveDays] = useState<Set<string>>(() => new Set());
 
-  // WFH days: Set of YYYY-MM-DD strings
-  const [wfhDays, setWfhDays] = useState<Set<string>>(() => {
-    if (typeof window === "undefined") return new Set();
-    try {
-      const saved = localStorage.getItem(`dcon_wfh_days_${personId}`);
-      if (saved) return new Set(JSON.parse(saved));
-    } catch (e) {}
-    return new Set();
-  });
+  // WFH days: Set of YYYY-MM-DD strings (Hydrated from backend DB)
+  const [wfhDays, setWfhDays] = useState<Set<string>>(() => new Set());
 
   const [showWfhCal,  setShowWfhCal]  = useState(false);
   const [wfhCalMonth, setWfhCalMonth] = useState<Date>(() => new Date());
@@ -250,85 +236,43 @@ export default function MyTimesheetPage() {
   const [halfDayCalMonth, setHalfDayCalMonth] = useState<Date>(() => new Date());
   const [pendingHalfDayDate, setPendingHalfDayDate] = useState<string | null>(null);
 
-  // Half day leaves: Map YYYY-MM-DD -> 'first' | 'second'
-  const [halfDays, setHalfDays] = useState<Map<string, "first" | "second">>(() => {
-    if (typeof window === "undefined") return new Map();
-    try {
-      const saved = localStorage.getItem(`dcon_half_days_${personId}`);
-      if (saved) return new Map(Object.entries(JSON.parse(saved)));
-    } catch (e) {}
-    return new Map();
-  });
+  // Half day leaves: Map YYYY-MM-DD -> 'first' | 'second' (Hydrated from backend DB)
+  const [halfDays, setHalfDays] = useState<Map<string, "first" | "second">>(() => new Map());
 
   // Hydrate attendance from Backend API on mount & personId change
   useEffect(() => {
     if (!personId) return;
     let isMounted = true;
 
-    try {
-      const sLeave = localStorage.getItem(`dcon_leave_days_${personId}`);
-      const sWfh = localStorage.getItem(`dcon_wfh_days_${personId}`);
-      const sHalf = localStorage.getItem(`dcon_half_days_${personId}`);
-      if (sLeave && isMounted) setLeaveDays(new Set(JSON.parse(sLeave)));
-      if (sWfh && isMounted) setWfhDays(new Set(JSON.parse(sWfh)));
-      if (sHalf && isMounted) setHalfDays(new Map(Object.entries(JSON.parse(sHalf))));
-    } catch (e) {}
-
-    fetch(`/api-proxy/time/attendance?person_id=${encodeURIComponent(personId)}`)
+    fetch(`/api-proxy/time/attendance?person_id=${encodeURIComponent(personId)}&t=${Date.now()}`, {
+      cache: 'no-store',
+      headers: {
+        'Cache-Control': 'no-cache, no-store, must-revalidate'
+      }
+    })
       .then(res => res.ok ? res.json() : null)
       .then(data => {
         if (!data || !isMounted) return;
-        if (Array.isArray(data.leaveDays)) {
-          const s = new Set<string>(data.leaveDays);
-          setLeaveDays(s);
-          try { localStorage.setItem(`dcon_leave_days_${personId}`, JSON.stringify(Array.from(s))); } catch (e) {}
-        }
-        if (Array.isArray(data.wfhDays)) {
-          const s = new Set<string>(data.wfhDays);
-          setWfhDays(s);
-          try { localStorage.setItem(`dcon_wfh_days_${personId}`, JSON.stringify(Array.from(s))); } catch (e) {}
-        }
-        if (data.halfDays && typeof data.halfDays === "object") {
-          const m = new Map<string, "first" | "second">(Object.entries(data.halfDays));
-          setHalfDays(m);
-          try { localStorage.setItem(`dcon_half_days_${personId}`, JSON.stringify(Object.fromEntries(m))); } catch (e) {}
-        }
+        const fetchedLeave = new Set<string>(Array.isArray(data.leaveDays) ? data.leaveDays : []);
+        const fetchedWfh = new Set<string>(Array.isArray(data.wfhDays) ? data.wfhDays : []);
+        const fetchedHalf = new Map<string, "first" | "second">(
+          data.halfDays && typeof data.halfDays === "object" ? Object.entries(data.halfDays) : []
+        );
+
+        setLeaveDays(fetchedLeave);
+        setWfhDays(fetchedWfh);
+        setHalfDays(fetchedHalf);
+
+        try {
+          localStorage.setItem(`dcon_leave_days_${personId}`, JSON.stringify(Array.from(fetchedLeave)));
+          localStorage.setItem(`dcon_wfh_days_${personId}`, JSON.stringify(Array.from(fetchedWfh)));
+          localStorage.setItem(`dcon_half_days_${personId}`, JSON.stringify(Object.fromEntries(fetchedHalf)));
+        } catch (e) {}
       })
       .catch(err => console.error("Error fetching attendance logs:", err));
 
     return () => { isMounted = false; };
   }, [personId]);
-
-  // Sync state changes to localStorage and Backend API
-  const isInitialMount = useRef(true);
-  useEffect(() => {
-    if (isInitialMount.current) {
-      isInitialMount.current = false;
-      return;
-    }
-    if (!personId) return;
-
-    const leaveArr = Array.from(leaveDays);
-    const wfhArr = Array.from(wfhDays);
-    const halfObj = Object.fromEntries(halfDays);
-
-    try {
-      localStorage.setItem(`dcon_leave_days_${personId}`, JSON.stringify(leaveArr));
-      localStorage.setItem(`dcon_wfh_days_${personId}`, JSON.stringify(wfhArr));
-      localStorage.setItem(`dcon_half_days_${personId}`, JSON.stringify(halfObj));
-    } catch (e) {}
-
-    fetch("/api-proxy/time/attendance", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        person_id: personId,
-        leaveDays: leaveArr,
-        wfhDays: wfhArr,
-        halfDays: halfObj
-      })
-    }).catch(err => console.error("Error persisting attendance logs:", err));
-  }, [leaveDays, wfhDays, halfDays, personId]);
 
   // Refs for click-outside dismissal
   const weekCalRef     = useRef<HTMLDivElement>(null);
@@ -479,32 +423,59 @@ export default function MyTimesheetPage() {
     setShowWeekCal(false);
   };
 
+  const saveAttendanceToApi = (
+    nextLeave: Set<string>,
+    nextWfh: Set<string>,
+    nextHalf: Map<string, "first" | "second">
+  ) => {
+    setLeaveDays(nextLeave);
+    setWfhDays(nextWfh);
+    setHalfDays(nextHalf);
+
+    const leaveArr = Array.from(nextLeave);
+    const wfhArr = Array.from(nextWfh);
+    const halfObj = Object.fromEntries(nextHalf);
+
+    try {
+      localStorage.setItem(`dcon_leave_days_${personId}`, JSON.stringify(leaveArr));
+      localStorage.setItem(`dcon_wfh_days_${personId}`, JSON.stringify(wfhArr));
+      localStorage.setItem(`dcon_half_days_${personId}`, JSON.stringify(halfObj));
+    } catch (e) {}
+
+    if (personId) {
+      fetch("/api-proxy/time/attendance", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          person_id: personId,
+          leaveDays: leaveArr,
+          wfhDays: wfhArr,
+          halfDays: halfObj
+        })
+      }).catch(err => console.error("Error persisting attendance logs:", err));
+    }
+  };
+
   const handleLeaveCalClick = (d: Date) => {
     const ds = toYMD(d);
-    setLeaveDays(prev => {
-      const next = new Set(prev);
-      next.has(ds) ? next.delete(ds) : next.add(ds);
-      return next;
-    });
+    const next = new Set(leaveDays);
+    next.has(ds) ? next.delete(ds) : next.add(ds);
+    saveAttendanceToApi(next, wfhDays, halfDays);
   };
 
   const handleWfhCalClick = (d: Date) => {
     const ds = toYMD(d);
-    setWfhDays(prev => {
-      const next = new Set(prev);
-      next.has(ds) ? next.delete(ds) : next.add(ds);
-      return next;
-    });
+    const next = new Set(wfhDays);
+    next.has(ds) ? next.delete(ds) : next.add(ds);
+    saveAttendanceToApi(leaveDays, next, halfDays);
   };
 
   const handleHalfDayCalClick = (d: Date) => {
     const ds = toYMD(d);
     if (halfDays.has(ds)) {
-      setHalfDays(prev => {
-        const next = new Map(prev);
-        next.delete(ds);
-        return next;
-      });
+      const next = new Map(halfDays);
+      next.delete(ds);
+      saveAttendanceToApi(leaveDays, wfhDays, next);
     } else {
       setPendingHalfDayDate(ds);
     }
@@ -512,12 +483,10 @@ export default function MyTimesheetPage() {
 
   const handleSelectHalf = (type: "first" | "second") => {
     if (pendingHalfDayDate) {
-      setHalfDays(prev => {
-        const next = new Map(prev);
-        next.set(pendingHalfDayDate, type);
-        return next;
-      });
+      const next = new Map(halfDays);
+      next.set(pendingHalfDayDate, type);
       setPendingHalfDayDate(null);
+      saveAttendanceToApi(leaveDays, wfhDays, next);
     }
   };
 
@@ -724,16 +693,34 @@ export default function MyTimesheetPage() {
                 />
 
                 {leaveDays.size > 0 && (
-                  <div className="px-3 pb-3 pt-2 border-t border-slate-100 flex items-center justify-between">
-                    <span className="text-[10px] text-slate-500 font-semibold">
-                      {leaveDays.size} day{leaveDays.size > 1 ? "s" : ""} marked
-                    </span>
-                    <button
-                      onClick={() => setLeaveDays(new Set())}
-                      className="text-[10px] text-danger-red font-bold hover:underline"
-                    >
-                      Clear all
-                    </button>
+                  <div className="px-3 pb-3 pt-2 border-t border-slate-100 space-y-1.5">
+                    <div className="flex items-center justify-between text-[10px] text-slate-500 font-bold uppercase tracking-wider">
+                      <span>Marked Leave ({leaveDays.size})</span>
+                      <button
+                        onClick={() => saveAttendanceToApi(new Set(), wfhDays, halfDays)}
+                        className="text-[10px] text-danger-red font-bold hover:underline"
+                      >
+                        Delete all
+                      </button>
+                    </div>
+                    <div className="max-h-28 overflow-y-auto space-y-1 pr-1">
+                      {Array.from(leaveDays).map(d => (
+                        <div key={d} className="flex items-center justify-between bg-orange-50/80 border border-orange-200 px-2 py-1 rounded text-[11px]">
+                          <span className="font-bold text-orange-800">{d}</span>
+                          <button
+                            onClick={() => {
+                              const next = new Set(leaveDays);
+                              next.delete(d);
+                              saveAttendanceToApi(next, wfhDays, halfDays);
+                            }}
+                            className="text-orange-400 hover:text-red-600 p-0.5 rounded transition-colors"
+                            title="Delete this leave entry"
+                          >
+                            <Trash2 className="w-3 h-3" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 )}
               </div>
@@ -787,16 +774,34 @@ export default function MyTimesheetPage() {
                 />
 
                 {wfhDays.size > 0 && (
-                  <div className="px-3 pb-3 pt-2 border-t border-slate-100 flex items-center justify-between">
-                    <span className="text-[10px] text-slate-500 font-semibold">
-                      {wfhDays.size} day{wfhDays.size > 1 ? "s" : ""} marked
-                    </span>
-                    <button
-                      onClick={() => setWfhDays(new Set())}
-                      className="text-[10px] text-dc-blue font-bold hover:underline"
-                    >
-                      Clear all
-                    </button>
+                  <div className="px-3 pb-3 pt-2 border-t border-slate-100 space-y-1.5">
+                    <div className="flex items-center justify-between text-[10px] text-slate-500 font-bold uppercase tracking-wider">
+                      <span>Marked WFH ({wfhDays.size})</span>
+                      <button
+                        onClick={() => saveAttendanceToApi(leaveDays, new Set(), halfDays)}
+                        className="text-[10px] text-danger-red font-bold hover:underline"
+                      >
+                        Delete all
+                      </button>
+                    </div>
+                    <div className="max-h-28 overflow-y-auto space-y-1 pr-1">
+                      {Array.from(wfhDays).map(d => (
+                        <div key={d} className="flex items-center justify-between bg-blue-50/80 border border-blue-200 px-2 py-1 rounded text-[11px]">
+                          <span className="font-bold text-blue-800">{d}</span>
+                          <button
+                            onClick={() => {
+                              const next = new Set(wfhDays);
+                              next.delete(d);
+                              saveAttendanceToApi(leaveDays, next, halfDays);
+                            }}
+                            className="text-blue-400 hover:text-red-600 p-0.5 rounded transition-colors"
+                            title="Delete this WFH entry"
+                          >
+                            <Trash2 className="w-3 h-3" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 )}
               </div>
@@ -880,16 +885,34 @@ export default function MyTimesheetPage() {
                 </div>
 
                 {halfDays.size > 0 && (
-                  <div className="px-3 pb-3 pt-2 border-t border-slate-100 flex items-center justify-between">
-                    <span className="text-[10px] text-slate-500 font-semibold">
-                      {halfDays.size} day{halfDays.size > 1 ? "s" : ""} marked
-                    </span>
-                    <button
-                      onClick={() => setHalfDays(new Map())}
-                      className="text-[10px] text-danger-red font-bold hover:underline"
-                    >
-                      Clear all
-                    </button>
+                  <div className="px-3 pb-3 pt-2 border-t border-slate-100 space-y-1.5">
+                    <div className="flex items-center justify-between text-[10px] text-slate-500 font-bold uppercase tracking-wider">
+                      <span>Marked Half Days ({halfDays.size})</span>
+                      <button
+                        onClick={() => saveAttendanceToApi(leaveDays, wfhDays, new Map())}
+                        className="text-[10px] text-danger-red font-bold hover:underline"
+                      >
+                        Delete all
+                      </button>
+                    </div>
+                    <div className="max-h-28 overflow-y-auto space-y-1 pr-1">
+                      {Array.from(halfDays.entries()).map(([d, val]) => (
+                        <div key={d} className="flex items-center justify-between bg-amber-50/80 border border-amber-200 px-2 py-1 rounded text-[11px]">
+                          <span className="font-bold text-amber-800">{d} ({val === "first" ? "1st Half" : "2nd Half"})</span>
+                          <button
+                            onClick={() => {
+                              const next = new Map(halfDays);
+                              next.delete(d);
+                              saveAttendanceToApi(leaveDays, wfhDays, next);
+                            }}
+                            className="text-amber-400 hover:text-red-600 p-0.5 rounded transition-colors"
+                            title="Delete this half day entry"
+                          >
+                            <Trash2 className="w-3 h-3" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 )}
               </div>
@@ -1183,8 +1206,22 @@ export default function MyTimesheetPage() {
 
               {/* Leave day indicator */}
               {isLeaveDay && (
-                <div className="mb-3 bg-orange-50 border border-orange-200 rounded p-2.5 text-center">
-                  <div className="text-[10px] font-black text-orange-600">Leave Day</div>
+                <div className="mb-3 bg-orange-50 border border-orange-200 rounded p-2.5">
+                  <div className="flex items-center justify-between">
+                    <div className="text-[10px] font-black text-orange-600">Leave Day</div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const next = new Set(leaveDays);
+                        next.delete(dateStr);
+                        saveAttendanceToApi(next, wfhDays, halfDays);
+                      }}
+                      className="text-orange-400 hover:text-red-600 transition-colors p-0.5 rounded hover:bg-orange-100 cursor-pointer"
+                      title="Delete Leave Day"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
                   <div className="text-[9px] text-orange-400 font-semibold mt-0.5">
                     9 hr deducted from weekly target
                   </div>
@@ -1193,8 +1230,22 @@ export default function MyTimesheetPage() {
 
               {/* WFH day indicator */}
               {isWfhDay && (
-                <div className="mb-3 bg-blue-50 border border-blue-200 rounded p-2.5 text-center">
-                  <div className="text-[10px] font-black text-blue-600">Working From Home</div>
+                <div className="mb-3 bg-blue-50 border border-blue-200 rounded p-2.5">
+                  <div className="flex items-center justify-between">
+                    <div className="text-[10px] font-black text-blue-600">Working From Home</div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const next = new Set(wfhDays);
+                        next.delete(dateStr);
+                        saveAttendanceToApi(leaveDays, next, halfDays);
+                      }}
+                      className="text-blue-400 hover:text-red-600 transition-colors p-0.5 rounded hover:bg-blue-100 cursor-pointer"
+                      title="Delete WFH Day"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
                   <div className="text-[9px] text-blue-400 font-semibold mt-0.5">
                     Standard hours count towards target
                   </div>
@@ -1203,9 +1254,23 @@ export default function MyTimesheetPage() {
 
               {/* Half Day indicator */}
               {halfDayHalf && (
-                <div className="mb-3 bg-amber-50 border border-amber-200 rounded p-2.5 text-center">
-                  <div className="text-[10px] font-black text-amber-600">
-                    Half Day ({halfDayHalf === "first" ? "1st Half" : "2nd Half"})
+                <div className="mb-3 bg-amber-50 border border-amber-200 rounded p-2.5">
+                  <div className="flex items-center justify-between">
+                    <div className="text-[10px] font-black text-amber-600">
+                      Half Day ({halfDayHalf === "first" ? "1st Half" : "2nd Half"})
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const next = new Map(halfDays);
+                        next.delete(dateStr);
+                        saveAttendanceToApi(leaveDays, wfhDays, next);
+                      }}
+                      className="text-amber-400 hover:text-red-600 transition-colors p-0.5 rounded hover:bg-amber-100 cursor-pointer"
+                      title="Delete Half Day"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
                   </div>
                   <div className="text-[9px] text-amber-400 font-semibold mt-0.5">
                     4.5 hr deducted from weekly target

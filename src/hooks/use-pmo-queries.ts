@@ -24,15 +24,16 @@ export function useActiveProgrammeQuery(id: string) {
     queryKey: ["programme", id],
     queryFn: async () => {
       if (!id) return null;
-      try {
-        const res = await fetch(`/api-proxy/programmes/${id}`);
-        if (res.ok) return await res.json();
-      } catch (e) {
-        console.error("Error fetching single programme:", e);
+      const res = await fetch(`/api-proxy/programmes/${id}`);
+      if (!res.ok) {
+        throw new Error("Failed to fetch programme, status: " + res.status);
       }
-      return programmes?.find(p => p.id === id) || null;
+      return res.json();
     },
-    initialData: () => programmes?.find(p => p.id === id) || null,
+    initialData: () => {
+      if (!programmes || programmes.length === 0) return undefined;
+      return programmes.find(p => p.id === id) || undefined;
+    },
     enabled: !!id,
   });
 }

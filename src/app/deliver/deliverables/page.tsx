@@ -3,11 +3,10 @@
 import React, { useState, useMemo } from "react";
 import { usePmoStore } from "@/store/use-pmo-store";
 import { useActiveProgrammeQuery, useTasksQuery } from "@/hooks/use-pmo-queries";
-import { 
-  Award, Search, Plus, FileSpreadsheet, Edit3, X
-} from "lucide-react";
+import { Award, Search, Plus, FileSpreadsheet, Edit3, X } from "lucide-react";
 import { cn } from "@/utils/cn";
 import { Task } from "@/types/pmo";
+import { useQueryClient } from "@tanstack/react-query";
 
 export default function DeliverablesPage() {
   const activeProgrammeId = usePmoStore((state) => state.activeProgrammeId);
@@ -140,8 +139,10 @@ export default function DeliverablesPage() {
     setIsModalOpen(true);
   };
 
+  const queryClient = useQueryClient();
+
   // Submit handler
-  const handleFormSubmit = (e: React.FormEvent) => {
+  const handleFormSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formWbs.trim() || !formName.trim()) {
       alert("Please fill in WBS Code and Deliverable Name.");
@@ -169,11 +170,11 @@ export default function DeliverablesPage() {
     };
 
     if (editingTask) {
-      updateTask(editingTask.wbs, payload);
+      await updateTask(editingTask.wbs, payload);
     } else {
       // Create new L3 task
       const newWbs = formWbs.includes("-") ? formWbs : `${activeProgrammeId}-${formWbs}`;
-      addTask({
+      await addTask({
         ...payload,
         wbs: newWbs,
         programme_id: activeProgrammeId,
@@ -182,6 +183,9 @@ export default function DeliverablesPage() {
         blocked_hr: 0
       });
     }
+
+    // Invalidate the tasks query to fetch the newly added deliverable
+    queryClient.invalidateQueries({ queryKey: ["tasks", activeProgrammeId] });
 
     setIsModalOpen(false);
   };
