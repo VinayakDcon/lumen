@@ -10,7 +10,7 @@ import {
   BarChart2, Clock, CheckCircle2, AlertOctagon, ArrowUpRight, Search, Trash2, X
 } from "lucide-react";
 import { cn } from "@/utils/cn";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Programme } from "@/types/pmo";
 
 // Phase Templates Presets
@@ -104,6 +104,7 @@ const DEPT_LABELS: Record<string, string> = {
 
 export default function PortfolioPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
 
   const { data: programmes = [], isLoading } = useProgrammesQuery();
   const activeProgrammeId = usePmoStore((state) => state.activeProgrammeId);
@@ -113,21 +114,34 @@ export default function PortfolioPage() {
   const people = usePmoStore((state) => state.people);
 
   // Filter states
-  const [filterPortfolio, setFilterPortfolio] = useState<string>("");
+  const initialFilter = searchParams.get("filter") || searchParams.get("portfolio") || "";
+  const [filterPortfolio, setFilterPortfolio] = useState<string>(initialFilter);
   const [filterBu, setFilterBu] = useState<string>("");
   const [search, setSearch] = useState<string>("");
+
+  useEffect(() => {
+    const fParam = searchParams.get("filter") || searchParams.get("portfolio");
+    if (fParam) {
+      setFilterPortfolio(fParam);
+    }
+  }, [searchParams]);
 
   const openProgrammeWizard = usePmoStore((state) => state.openProgrammeWizard);
   const isPMO = user?.role === "PMO";
 
-
+  const isCompletedProg = (p: Programme) => 
+    ['COMPLETED', 'CLOSED'].includes(p.status);
 
   // Filter programmes based on controls
   const filteredProgrammes = programmes.filter((p) => {
     if (filterPortfolio) {
-      const isActiveGroup = ['ACTIVE', 'PLANNING', 'ON_HOLD'].includes(p.status);
+      const isCompGroup = isCompletedProg(p);
+      const isActiveGroup = ['ACTIVE', 'PLANNING', 'ON_HOLD'].includes(p.status) && !isCompGroup;
+      const isRfqGroup = p.status === "RFQ_RESPONSE";
+
       if (filterPortfolio === "ACTIVE" && !isActiveGroup) return false;
-      if (filterPortfolio === "RFQ" && p.status !== "RFQ_RESPONSE") return false;
+      if (filterPortfolio === "RFQ" && !isRfqGroup) return false;
+      if (filterPortfolio === "COMPLETED" && !isCompGroup) return false;
     }
     if (filterBu && p.department !== filterBu) return false;
     if (search) {
@@ -152,8 +166,9 @@ export default function PortfolioPage() {
 
   // Calculate dynamic summaries
   const totalCount = filteredProgrammes.length;
-  const activeCount = filteredProgrammes.filter(p => ['PLANNING', 'ACTIVE', 'ON_HOLD'].includes(p.status)).length;
+  const activeCount = filteredProgrammes.filter(p => ['PLANNING', 'ACTIVE', 'ON_HOLD'].includes(p.status) && !isCompletedProg(p)).length;
   const rfqCount = filteredProgrammes.filter(p => p.status === 'RFQ_RESPONSE').length;
+  const completedCount = filteredProgrammes.filter(p => isCompletedProg(p)).length;
 
   if (isLoading) {
     return (
@@ -186,12 +201,15 @@ export default function PortfolioPage() {
   // Grouping by Portfolio Type -> Department
   const grouped: Record<string, Record<string, Programme[]>> = {
     ACTIVE: {},
-    RFQ: {}
+    RFQ: {},
+    COMPLETED: {}
   };
 
   filteredProgrammes.forEach(p => {
-    const type = ['PLANNING', 'ACTIVE', 'ON_HOLD'].includes(p.status) ? 'ACTIVE' : (p.status === 'RFQ_RESPONSE' ? 'RFQ' : 'OTHER');
-    if (type === 'OTHER') return;
+    const isComp = isCompletedProg(p);
+    const type = isComp 
+      ? 'COMPLETED' 
+      : (['PLANNING', 'ACTIVE', 'ON_HOLD'].includes(p.status) ? 'ACTIVE' : (p.status === 'RFQ_RESPONSE' ? 'RFQ' : 'ACTIVE'));
     const dept = p.department || 'BU1';
     if (!grouped[type][dept]) grouped[type][dept] = [];
     grouped[type][dept].push(p);
@@ -208,7 +226,7 @@ export default function PortfolioPage() {
             <span>Portfolio Overview · All Programmes</span>
           </h2>
           <p className="text-xs text-slate-500 mt-1">
-            Monitor state reviews, resource capacities, and deliverables across active and pipeline RFQ workloads.
+            Monitor state reviews, resource capacities, and deliverables across active, RFQ, and completed projects.
           </p>
         </div>
 
@@ -217,11 +235,12 @@ export default function PortfolioPage() {
           <select
             value={filterPortfolio}
             onChange={(e) => setFilterPortfolio(e.target.value)}
-            className="border border-slate-200 rounded px-3 py-1.5 text-xs focus:outline-none focus:border-dc-blue bg-white text-slate-700 w-36 sm:w-40 font-semibold"
+            className="border border-slate-200 rounded px-3 py-1.5 text-xs focus:outline-none focus:border-dc-blue bg-white text-slate-700 w-36 sm:w-44 font-semibold"
           >
             <option value="">All Portfolios</option>
             <option value="ACTIVE">Active Portfolio</option>
             <option value="RFQ">RFQ Portfolio</option>
+            <option value="COMPLETED">Completed Projects</option>
           </select>
 
           <select
@@ -261,6 +280,10 @@ export default function PortfolioPage() {
           <span className="text-2xl font-black text-navy block">{rfqCount}</span>
           <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider mt-1 block">RFQs</span>
         </div>
+        <div className="bg-white border border-border-base rounded-lg p-4 shadow-sm text-center">
+          <span className="text-2xl font-black text-emerald-600 block">{completedCount}</span>
+          <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider mt-1 block">Completed</span>
+        </div>
         {departmentsWithCounts.map(dept => (
           <div key={dept.name} className="bg-white border border-border-base rounded-lg p-4 shadow-sm text-center">
             <span className="text-2xl font-black text-navy block">{dept.count}</span>
@@ -293,14 +316,23 @@ export default function PortfolioPage() {
         </div>
       ) : (
         <div className="space-y-8">
-          {["ACTIVE", "RFQ"].map(type => {
+          {["ACTIVE", "RFQ", "COMPLETED"].map(type => {
             const hasGroupItems = DEPT_ORDER.some(dept => grouped[type][dept] && grouped[type][dept].length > 0);
             if (!hasGroupItems) return null;
 
+            const sectionTitle = type === "ACTIVE" 
+              ? "ACTIVE PROGRAMMES" 
+              : (type === "RFQ" ? "RFQ PROGRAMMES" : "COMPLETED PROJECTS");
+
             return (
               <div key={type} className="space-y-6">
-                <h2 className="text-sm font-black text-dc-deep tracking-wider border-b border-slate-200 pb-2 uppercase mt-6">
-                  {type} PROGRAMMES
+                <h2 className="text-sm font-black text-dc-deep tracking-wider border-b border-slate-200 pb-2 uppercase mt-6 flex items-center gap-2">
+                  {type === "COMPLETED" ? (
+                    <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                  ) : (
+                    <FolderKanban className="w-4 h-4 text-dc-blue" />
+                  )}
+                  <span>{sectionTitle}</span>
                 </h2>
 
                 {DEPT_ORDER.map(dept => {
@@ -326,6 +358,8 @@ export default function PortfolioPage() {
                             statusPillClass = "bg-amber-50 text-warning-amber border border-amber-200";
                           } else if (p.status === "RFQ_RESPONSE") {
                             statusPillClass = "bg-orange-50 text-orange-600 border border-orange-200";
+                          } else if (['COMPLETED', 'CLOSED'].includes(p.status) || isCompletedProg(p)) {
+                            statusPillClass = "bg-emerald-50 text-emerald-700 border border-emerald-200 font-extrabold";
                           }
 
                           return (

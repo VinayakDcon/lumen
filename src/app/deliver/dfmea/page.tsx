@@ -340,10 +340,10 @@ export default function DfmeaPage() {
       {/* Double pane: Left is Table, Right is slide-out drawer */}
       <div className="flex-1 flex gap-4 min-h-[400px]">
         {/* Main table */}
-        <div className="bg-white border border-slate-200 rounded-lg shadow-sm overflow-hidden flex-1">
-          <table className="w-full text-left border-collapse table-auto">
-            <thead>
-              <tr className="bg-slate-50 border-b border-slate-200 text-slate-400 font-bold uppercase tracking-wider text-[9px] select-none">
+        <div className="bg-white border border-slate-200 rounded-lg shadow-sm overflow-auto flex-1">
+          <table className="w-full text-left border-collapse table-auto min-w-[1000px]">
+            <thead className="sticky top-0 z-10 bg-slate-50 border-b border-slate-200">
+              <tr className="text-slate-400 font-bold uppercase tracking-wider text-[9px] select-none">
                 <th className="px-4 py-3">Code</th>
                 <th className="px-4 py-3">Function/Part</th>
                 <th className="px-4 py-3">Failure Mode</th>

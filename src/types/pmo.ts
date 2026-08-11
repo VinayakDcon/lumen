@@ -1,4 +1,4 @@
-export type ProgramStatus = 'ACTIVE' | 'PLANNING' | 'RFQ_RESPONSE' | 'ON_HOLD' | 'CLOSED';
+export type ProgramStatus = 'ACTIVE' | 'PLANNING' | 'RFQ_RESPONSE' | 'ON_HOLD' | 'CLOSED' | 'COMPLETED';
 
 export interface Programme {
   id: string;

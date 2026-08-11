@@ -67,6 +67,7 @@ export function Sidebar() {
       title: "PORTFOLIO",
       items: [
         { label: "All Programmes", href: "/portfolio", icon: FolderKanban },
+        { label: "Completed Projects", href: "/portfolio?filter=COMPLETED", icon: CheckSquare },
         { label: "Templates & Workflows", href: "/templates", icon: LayoutTemplate },
       ]
     },
@@ -222,22 +223,32 @@ export function Sidebar() {
                 Switch Programme
               </div>
               <div className="max-h-60 overflow-y-auto">
-                {programmes.map((p) => (
-                  <button
-                    key={p.id}
-                    onClick={() => {
-                      switchProgramme(p.id);
-                      setShowProgDropdown(false);
-                    }}
-                    className={cn(
-                      "w-full text-left px-3.5 py-2.5 border-b border-slate-100 hover:bg-slate-50 transition-colors flex flex-col gap-0.5",
-                      p.id === activeProgrammeId && "bg-blue-50/50 border-l-4 border-l-dc-blue"
-                    )}
-                  >
-                    <span className="text-xs font-bold text-navy truncate">{p.name}</span>
-                    <span className="text-[10px] text-slate-500">{p.customer} · {p.programme_weeks}w</span>
-                  </button>
-                ))}
+                {programmes.map((p) => {
+                  const isCompleted = ['COMPLETED', 'CLOSED'].includes(p.status);
+                  return (
+                    <button
+                      key={p.id}
+                      onClick={() => {
+                        switchProgramme(p.id);
+                        setShowProgDropdown(false);
+                      }}
+                      className={cn(
+                        "w-full text-left px-3.5 py-2.5 border-b border-slate-100 hover:bg-slate-50 transition-colors flex flex-col gap-0.5",
+                        p.id === activeProgrammeId && "bg-blue-50/50 border-l-4 border-l-dc-blue"
+                      )}
+                    >
+                      <div className="flex items-center justify-between gap-1">
+                        <span className="text-xs font-bold text-navy truncate">{p.name}</span>
+                        {isCompleted && (
+                          <span className="text-[8px] font-extrabold uppercase bg-emerald-100 text-emerald-800 px-1 py-0.2 rounded shrink-0">
+                            Completed
+                          </span>
+                        )}
+                      </div>
+                      <span className="text-[10px] text-slate-500">{p.department || 'BU1'} · {p.customer || 'DContour'} · {p.programme_weeks}w</span>
+                    </button>
+                  );
+                })}
               </div>
             </div>
           )}
