@@ -2,7 +2,7 @@
 
 import React, { useState, useMemo } from "react";
 import { usePmoStore } from "@/store/use-pmo-store";
-import { useActiveProgrammeQuery, useTasksQuery } from "@/hooks/use-pmo-queries";
+import { useActiveProgrammeQuery, useTasksQuery, useUpdateTaskMutation, useCreateTaskMutation } from "@/hooks/use-pmo-queries";
 import { 
   Plus, ChevronDown, ChevronRight, X, UploadCloud, Trash2
 } from "lucide-react";
@@ -36,9 +36,8 @@ export default function KanbanPage() {
   const activeProgrammeId = usePmoStore((state) => state.activeProgrammeId);
   
   // Store actions
-  const addTask = usePmoStore((state) => state.addTask);
-  const updateTask = usePmoStore((state) => state.updateTask);
-  const deleteTask = usePmoStore((state) => state.deleteTask);
+  const createTaskMutation = useCreateTaskMutation();
+  const updateTaskMutation = useUpdateTaskMutation();
   const people = usePmoStore((state) => state.people);
 
   // Queries
@@ -142,8 +141,7 @@ export default function KanbanPage() {
       updates.percent_complete = 0;
     }
     
-    await updateTask(wbs, updates);
-    refetch();
+    updateTaskMutation.mutate({ wbs, programme_id: activeProgrammeId, ...updates });
   };
 
   // Quick Status Advance
@@ -156,8 +154,7 @@ export default function KanbanPage() {
     } else if (nextStatus === "NOT STARTED") {
       updates.percent_complete = 0;
     }
-    await updateTask(wbs, updates);
-    refetch();
+    updateTaskMutation.mutate({ wbs, programme_id: activeProgrammeId, ...updates });
   };
 
   // Open Edit Modal
@@ -224,14 +221,13 @@ export default function KanbanPage() {
     };
 
     if (editingTask) {
-      await updateTask(editingTask.wbs, taskPayload);
+      updateTaskMutation.mutate({ wbs: editingTask.wbs, programme_id: activeProgrammeId, ...taskPayload });
     } else {
-      await addTask(taskPayload);
+      createTaskMutation.mutate(taskPayload);
     }
 
     setIsModalOpen(false);
     setEditingTask(null);
-    refetch();
   };
 
   if (!activeProgrammeId) {

@@ -2,7 +2,7 @@
 
 import React, { useState, useMemo } from "react";
 import { usePmoStore, mockResources } from "@/store/use-pmo-store";
-import { useActiveProgrammeQuery, useTasksQuery } from "@/hooks/use-pmo-queries";
+import { useActiveProgrammeQuery, useTasksQuery, useCreateTaskMutation, useUpdateTaskMutation, useDeleteTaskMutation } from "@/hooks/use-pmo-queries";
 import { 
   Plus, Upload, Download, Edit2, Trash2, ChevronDown, ChevronRight, 
   Search, ShieldAlert, Save, X, Check, HelpCircle, UploadCloud
@@ -17,9 +17,9 @@ export default function WbsPage() {
   const toggleHideCommercials = usePmoStore((state) => state.toggleHideCommercials);
   
   // Tasks mutations from store
-  const addTask = usePmoStore((state) => state.addTask);
-  const updateTask = usePmoStore((state) => state.updateTask);
-  const deleteTask = usePmoStore((state) => state.deleteTask);
+  const createTaskMutation = useCreateTaskMutation();
+  const updateTaskMutation = useUpdateTaskMutation();
+  const deleteTaskMutation = useDeleteTaskMutation();
   const people = usePmoStore((state) => state.people);
   
   // Queries
@@ -55,6 +55,7 @@ export default function WbsPage() {
   const [formStatus, setFormStatus] = useState<TaskStatus>("NOT STARTED");
   const [formPercent, setFormPercent] = useState(0);
   const [formApproval, setFormApproval] = useState<any>("—");
+  const [statusModified, setStatusModified] = useState(false);
   
   // Role checks
   const isEditor = useMemo(() => {
@@ -159,12 +160,11 @@ export default function WbsPage() {
     // Find all Level 3 descendants
     const descendants = rawTasks.filter(o => computeTaskLevel(o.wbs) === 3 && isDescendantOf(o.wbs, t.wbs));
     
-    // Sum of Level 2 children effort for Level 1, or own effort for Level 2
+    // Rollup plan hours from Level 3 descendants if they exist, otherwise use own plan hours
     let plan_hr = 0;
-    if (level === 1) {
-      const l2Children = rawTasks.filter(o => computeTaskLevel(o.wbs) === 2 && isDescendantOf(o.wbs, t.wbs));
-      plan_hr = l2Children.reduce((sum, c) => sum + (c.effort_hr || c.plan_hr || 0), 0);
-    } else if (level === 2) {
+    if (descendants.length > 0) {
+      plan_hr = descendants.reduce((sum, d) => sum + (d.effort_hr || d.plan_hr || 0), 0);
+    } else {
       plan_hr = t.effort_hr || t.plan_hr || 0;
     }
 
@@ -417,10 +417,12 @@ export default function WbsPage() {
       cost_inr: formPlanHr * 1500
     };
 
+    const payloadWithCascade = { ...taskPayload, cascade_status: statusModified };
+
     if (editingTask) {
-      await updateTask(editingTask.wbs, taskPayload);
+      updateTaskMutation.mutate({ wbs: editingTask.wbs, programme_id: activeProgrammeId, ...payloadWithCascade });
     } else {
-      await addTask(taskPayload);
+      createTaskMutation.mutate(taskPayload);
     }
 
     setIsModalOpen(false);
@@ -446,11 +448,13 @@ export default function WbsPage() {
     setFormStatus("NOT STARTED");
     setFormPercent(0);
     setFormApproval("—");
+    setStatusModified(false);
     setIsModalOpen(true);
   };
 
   // Open modal for editing task
   const openEditModal = (t: Task) => {
+    const rolled = rollupTaskInfo(t);
     setEditingTask(t);
     setFormWbs(t.wbs);
     setFormName(t.name);
@@ -464,9 +468,10 @@ export default function WbsPage() {
     setFormBlockedHr(t.blocked_hr || 0);
     setFormResources(t.resources ? t.resources.split(",").map(r => r.trim()).filter(Boolean) : []);
     setFormReviewer(t.reviewer || "—");
-    setFormStatus(t.status);
-    setFormPercent(t.percent_complete || 0);
+    setFormStatus(rolled.status);
+    setFormPercent(rolled.percent);
     setFormApproval(t.approval_status || "—");
+    setStatusModified(false);
     setIsModalOpen(true);
   };
 
@@ -618,6 +623,10 @@ export default function WbsPage() {
   };
 
   // Unified row renderer
+  const handleInlineStatusChange = (t: Task, nextStatus: TaskStatus) => {
+    updateTaskMutation.mutate({ wbs: t.wbs, programme_id: activeProgrammeId, status: nextStatus });
+  };
+
   const renderTaskRow = (t: Task, isGroupedView = false) => {
     const taskLevel = computeTaskLevel(t.wbs);
     const rolled = rollupTaskInfo(t);
@@ -736,7 +745,7 @@ export default function WbsPage() {
 
         {/* Planned Hours */}
         <td className={cn("py-2 px-2 text-center", planHrTextClass)}>
-          {taskLevel === 3 ? "—" : (rolled.plan_hr || "—")}
+          {rolled.plan_hr || "—"}
         </td>
 
         {/* Actual Hours */}
@@ -822,9 +831,10 @@ export default function WbsPage() {
                       type="button"
                       onClick={(e) => {
                         e.stopPropagation();
-                        const updatedDocs = t.docs?.filter((_, i) => i !== idx) || [];
-                        updateTask(t.wbs, { docs: updatedDocs });
-                      }}
+                        if (t.docs) {
+                        const updatedDocs = t.docs.filter(d => d.id !== doc.id);
+                        updateTaskMutation.mutate({ wbs: t.wbs, programme_id: activeProgrammeId, docs: updatedDocs });
+                      }}}
                       className="text-slate-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity p-0"
                       title="Remove document"
                     >
@@ -867,14 +877,13 @@ export default function WbsPage() {
                         ? `${(file.size / (1024 * 1024)).toFixed(1)} MB`
                         : `${(file.size / 1024).toFixed(0)} KB`;
                       
-                      const newDoc = {
+                      const updatedDocs = [...(t.docs || []), {
+                        id: Date.now().toString(),
                         name: file.name,
-                        url: `/api-proxy/attachments/download/${uploadedFile.id}`,
-                        size: formattedSize
-                      };
-                      
-                      const updatedDocs = [...(t.docs || []), newDoc];
-                      await updateTask(t.wbs, { docs: updatedDocs });
+                        url: '#',
+                        uploaded_at: new Date().toISOString()
+                      }];
+                      updateTaskMutation.mutate({ wbs: t.wbs, programme_id: activeProgrammeId, docs: updatedDocs });
                       alert(`✓ File "${file.name}" attached successfully!`);
                       refetch();
                     } catch (err: any) {
@@ -900,10 +909,10 @@ export default function WbsPage() {
                 <span>Edit</span>
               </button>
               <button 
-                onClick={async () => {
-                  if (confirm(`Delete WBS task ${t.wbs}?`)) {
-                    await deleteTask(t.wbs);
-                    refetch();
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (confirm(`Delete task ${t.wbs}?`)) {
+                    deleteTaskMutation.mutate({ wbs: t.wbs, programme_id: activeProgrammeId });
                   }
                 }}
                 className="p-1 hover:bg-red-50 border border-slate-200 hover:border-red-200 text-slate-400 hover:text-red-600 rounded transition-all"
@@ -1034,7 +1043,6 @@ export default function WbsPage() {
               <button 
                 onClick={expandAll}
                 className="p-1.5 hover:bg-slate-100 rounded border border-slate-200 text-slate-500 hover:text-slate-700 transition-colors"
-                title="Expand All"
               >
                 <ChevronDown className="w-3.5 h-3.5" />
               </button>
@@ -1361,8 +1369,11 @@ export default function WbsPage() {
                   </label>
                   <select 
                     value={formStatus}
-                    onChange={(e) => setFormStatus(e.target.value as TaskStatus)}
-                    className="w-full bg-white border border-slate-200 rounded p-2 focus:outline-none focus:border-dc-blue"
+                    onChange={(e) => {
+                      setFormStatus(e.target.value as TaskStatus);
+                      setStatusModified(true);
+                    }}
+                    className="w-full p-2 border border-slate-200 rounded text-sm focus:ring-1 focus:ring-dc-blue"
                   >
                     <option value="NOT STARTED">Not Started</option>
                     <option value="IN PROGRESS">In Progress</option>

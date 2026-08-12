@@ -2,7 +2,7 @@
 
 import React, { useState, useMemo } from "react";
 import { usePmoStore } from "@/store/use-pmo-store";
-import { useActiveProgrammeQuery, useMilestonesQuery } from "@/hooks/use-pmo-queries";
+import { useActiveProgrammeQuery, useMilestonesQuery, useCreateMilestoneMutation, useUpdateMilestoneMutation, useDeleteMilestoneMutation } from "@/hooks/use-pmo-queries";
 import { 
   Flag, Search, Plus, FileSpreadsheet, Edit3, Trash2, X, AlertTriangle
 } from "lucide-react";
@@ -11,10 +11,10 @@ import { Milestone } from "@/types/pmo";
 
 export default function MilestonesPage() {
   const activeProgrammeId = usePmoStore((state) => state.activeProgrammeId);
-  const addMilestone = usePmoStore((state) => state.addMilestone);
-  const updateMilestone = usePmoStore((state) => state.updateMilestone);
-  const deleteMilestone = usePmoStore((state) => state.deleteMilestone);
-  const cycleMilestoneStatus = usePmoStore((state) => state.cycleMilestoneStatus);
+
+  const createMilestoneMutation = useCreateMilestoneMutation();
+  const updateMilestoneMutation = useUpdateMilestoneMutation();
+  const deleteMilestoneMutation = useDeleteMilestoneMutation();
 
   const { data: activeProgramme, isLoading: isProgLoading } = useActiveProgrammeQuery(activeProgrammeId);
   const { data: milestones = [], isLoading: isMilestonesLoading } = useMilestonesQuery(activeProgrammeId);
@@ -126,9 +126,9 @@ export default function MilestonesPage() {
     };
 
     if (editingMilestone) {
-      updateMilestone(editingMilestone.id, payload);
+      updateMilestoneMutation.mutate({ ...payload, id: editingMilestone.id, programme_id: activeProgrammeId });
     } else {
-      addMilestone(payload);
+      createMilestoneMutation.mutate(payload);
     }
 
     setIsModalOpen(false);
@@ -137,8 +137,14 @@ export default function MilestonesPage() {
   // Delete milestone handler
   const handleDeleteMilestone = (id: number) => {
     if (confirm("Are you sure you want to delete this milestone?")) {
-      deleteMilestone(id);
+      deleteMilestoneMutation.mutate({ id, programme_id: activeProgrammeId });
     }
+  };
+
+  const cycleMilestoneStatus = (id: number, currentStatus: Milestone["status"]) => {
+    const order: Array<Milestone["status"]> = ["PENDING", "AT RISK", "DONE"];
+    const nextStatus = order[(order.indexOf(currentStatus) + 1) % order.length];
+    updateMilestoneMutation.mutate({ id, status: nextStatus, programme_id: activeProgrammeId });
   };
 
   // CSV Export helper
@@ -364,7 +370,7 @@ export default function MilestonesPage() {
                   <td className="px-4 py-3 font-medium">{m.owner || "—"}</td>
                   <td className="px-4 py-3">
                     <button 
-                      onClick={() => cycleMilestoneStatus(m.id)}
+                      onClick={() => cycleMilestoneStatus(m.id, m.status)}
                       className={cn("inline-block border rounded-full px-2.5 py-0.5 text-[9px] font-bold tracking-wide transition-all shadow-2xs select-none cursor-pointer", getStatusClass(m.status))}
                     >
                       {m.status}

@@ -2,7 +2,7 @@
 
 import React, { useState, useMemo } from "react";
 import { usePmoStore } from "@/store/use-pmo-store";
-import { useActiveProgrammeQuery, useTasksQuery } from "@/hooks/use-pmo-queries";
+import { useActiveProgrammeQuery, useTasksQuery, useCreateTaskMutation, useUpdateTaskMutation, useDeleteTaskMutation } from "@/hooks/use-pmo-queries";
 import { 
   Plus, UploadCloud, ChevronDown, ChevronRight, 
   X, Check, Printer, Camera, Trash2
@@ -46,9 +46,9 @@ export default function GanttPage() {
   const activeProgrammeId = usePmoStore((state) => state.activeProgrammeId);
   
   // Tasks mutations and collapse state from store
-  const addTask = usePmoStore((state) => state.addTask);
-  const updateTask = usePmoStore((state) => state.updateTask);
-  const deleteTask = usePmoStore((state) => state.deleteTask);
+  const createTaskMutation = useCreateTaskMutation();
+  const updateTaskMutation = useUpdateTaskMutation();
+  const deleteTaskMutation = useDeleteTaskMutation();
   const people = usePmoStore((state) => state.people);
   const ganttCollapsed = usePmoStore((state) => state.ganttCollapsed);
   const toggleGanttCollapse = usePmoStore((state) => state.toggleGanttCollapse);
@@ -428,14 +428,13 @@ export default function GanttPage() {
     };
 
     if (editingTask) {
-      await updateTask(editingTask.wbs, taskPayload);
+      updateTaskMutation.mutate({ wbs: editingTask.wbs, programme_id: activeProgrammeId, ...taskPayload });
     } else {
-      await addTask(taskPayload);
+      createTaskMutation.mutate(taskPayload);
     }
 
     setIsModalOpen(false);
     setEditingTask(null);
-    refetch();
   };
 
   // Compile Gantt layout vector blocks in memory as a single combined SVG
@@ -1645,9 +1644,8 @@ export default function GanttPage() {
                     type="button"
                     onClick={() => {
                       if (confirm(`Delete WBS task ${displayWbs(editingTask.wbs)}?`)) {
-                        deleteTask(editingTask.wbs);
+                        deleteTaskMutation.mutate({ wbs: editingTask.wbs, programme_id: activeProgrammeId });
                         setIsModalOpen(false);
-                        refetch();
                       }
                     }}
                     className="flex items-center gap-1.5 bg-red-50 hover:bg-red-100 text-red-650 font-bold px-4 py-2 rounded border border-red-200 transition-colors mr-auto cursor-pointer text-xs"

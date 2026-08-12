@@ -143,6 +143,58 @@ export function useTasksQuery(id: string) {
   });
 }
 
+export function useCreateTaskMutation() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (data: Omit<Task, "id">) => {
+      const res = await fetch("/api-proxy/tasks", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      });
+      if (!res.ok) throw new Error("Failed to create task");
+      return res.json();
+    },
+    onSuccess: (_, variables) => {
+      qc.invalidateQueries({ queryKey: ["tasks", variables.programme_id] });
+    },
+  });
+}
+
+export function useUpdateTaskMutation() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ wbs, programme_id, ...data }: Partial<Task> & { wbs: string, programme_id: string }) => {
+      const res = await fetch(`/api-proxy/tasks/${wbs}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      });
+      if (!res.ok) throw new Error("Failed to update task");
+      return res.json();
+    },
+    onSuccess: (_, variables) => {
+      qc.invalidateQueries({ queryKey: ["tasks", variables.programme_id] });
+    },
+  });
+}
+
+export function useDeleteTaskMutation() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ wbs, programme_id }: { wbs: string, programme_id: string }) => {
+      const res = await fetch(`/api-proxy/tasks/${wbs}`, {
+        method: "DELETE",
+      });
+      if (!res.ok) throw new Error("Failed to delete task");
+      return res.json();
+    },
+    onSuccess: (_, variables) => {
+      qc.invalidateQueries({ queryKey: ["tasks", variables.programme_id] });
+    },
+  });
+}
+
 export function useEvmReportQuery(id: string, week?: number) {
   const getEvmReport = usePmoStore((state) => state.getEvmReport);
   const setTasks = usePmoStore((state) => state.setTasks);
@@ -219,6 +271,58 @@ export function useMilestonesQuery(pid: string) {
       return res.json();
     },
     enabled: !!pid,
+  });
+}
+
+export function useCreateMilestoneMutation() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (data: Omit<Milestone, "id">) => {
+      const res = await fetch("/api-proxy/milestones", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      });
+      if (!res.ok) throw new Error("Failed to create milestone");
+      return res.json();
+    },
+    onSuccess: (_, variables) => {
+      qc.invalidateQueries({ queryKey: ["milestones", variables.programme_id] });
+    },
+  });
+}
+
+export function useUpdateMilestoneMutation() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, ...data }: Partial<Milestone> & { id: number, programme_id: string }) => {
+      const res = await fetch(`/api-proxy/milestones/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      });
+      if (!res.ok) throw new Error("Failed to update milestone");
+      return res.json();
+    },
+    onSuccess: (_, variables) => {
+      qc.invalidateQueries({ queryKey: ["milestones", variables.programme_id] });
+    },
+  });
+}
+
+export function useDeleteMilestoneMutation() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, programme_id }: { id: number, programme_id: string }) => {
+      const res = await fetch(`/api-proxy/milestones/${id}`, {
+        method: "DELETE",
+      });
+      if (!res.ok) throw new Error("Failed to delete milestone");
+      return res.json();
+    },
+    onSuccess: (_, variables) => {
+      qc.invalidateQueries({ queryKey: ["milestones", variables.programme_id] });
+    },
   });
 }
 
