@@ -41,13 +41,13 @@ export default function TeamPage() {
       .filter((p) => {
         const query = searchQuery.toLowerCase();
         return (
-          p.name.toLowerCase().includes(query) ||
+          (p.name || "").toLowerCase().includes(query) ||
           (p.role && p.role.toLowerCase().includes(query)) ||
           (p.email && p.email.toLowerCase().includes(query)) ||
           (p.resource_id && p.resource_id.toLowerCase().includes(query))
         );
       })
-      .sort((a, b) => a.name.localeCompare(b.name));
+      .sort((a, b) => (a.name || "").localeCompare(b.name || ""));
   }, [people, searchQuery]);
 
   // Open modal

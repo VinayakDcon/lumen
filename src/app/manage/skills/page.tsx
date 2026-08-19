@@ -40,11 +40,11 @@ export default function SkillsMatrixPage() {
     return skills
       .filter((s) => {
         const query = searchQuery.toLowerCase();
-        const matchesSearch = s.name.toLowerCase().includes(query) || (s.description || "").toLowerCase().includes(query);
+        const matchesSearch = (s.name || "").toLowerCase().includes(query) || (s.description || "").toLowerCase().includes(query);
         const matchesCat = !categoryFilter || s.category === categoryFilter;
         return matchesSearch && matchesCat;
       })
-      .sort((a, b) => a.category.localeCompare(b.category) || a.name.localeCompare(b.name));
+      .sort((a, b) => (a.category || "").localeCompare(b.category || "") || (a.name || "").localeCompare(b.name || ""));
   }, [skills, searchQuery, categoryFilter]);
 
   // Open modal

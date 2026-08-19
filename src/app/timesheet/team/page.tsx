@@ -45,13 +45,13 @@ export default function TeamHoursPage() {
     : 0.0;
 
   // Build list of people to display as rows in pivot table
-  const peopleLogging = Array.from(new Set(filteredEntries.map((e: any) => e.person_name)));
-  peopleLogging.sort();
+  const peopleLogging = Array.from(new Set(filteredEntries.map((e: any) => e.person_name).filter(Boolean))) as string[];
+  peopleLogging.sort((a, b) => (a || "").localeCompare(b || ""));
 
   let allowedPeople: any[] = [];
   if (isFiltered && activeProg) {
     // 1. Get the list of all people assigned to the selected programme
-    const assignedPeople = people.filter(p => {
+    const assignedPeople = (people || []).filter(p => {
       const personKey = `person-${p.id}`;
       return activeProg.team_members?.includes(personKey);
     });
@@ -63,36 +63,41 @@ export default function TeamHoursPage() {
       allowedPeople = assignedPeople;
     } else {
       // Engineer / BD sees ONLY themselves
-      const selfPerson = people.find(p => p.email?.toLowerCase().trim() === user?.email?.toLowerCase().trim());
+      const selfPerson = (people || []).find(p => p.email?.toLowerCase().trim() === user?.email?.toLowerCase().trim()) ||
+        (people || []).find(p => p.name?.toLowerCase().trim() === user?.name?.toLowerCase().trim()) ||
+        (user?.name ? { id: user.id || 0, name: user.name } : null);
       allowedPeople = selfPerson ? [selfPerson] : [];
     }
   } else {
     // Unfiltered view (PMO/Admin only when filterByActive is unchecked)
     // Display all people who logged hours
     allowedPeople = peopleLogging.map(name => {
-      return people.find(p => p.name === name) || { id: name, name };
+      return (people || []).find(p => p.name === name) || { id: name, name };
     });
   }
 
-  // Sort allowed people names
-  allowedPeople.sort((a, b) => a.name.localeCompare(b.name));
+  // Filter out any null/undefined entries and sort allowed people names safely
+  allowedPeople = (allowedPeople || []).filter(p => p && (p.name || p.id));
+  allowedPeople.sort((a, b) => (a?.name || String(a?.id || "")).localeCompare(b?.name || String(b?.id || "")));
 
   // Get active columns (projects) in the filtered set
   const projectCols = isFiltered && activeProgrammeId 
     ? [activeProgrammeId] 
-    : Array.from(new Set(filteredEntries.filter((e: any) => e.programme_id && e.programme_id !== "DC_BAU" && e.programme_id !== "BENCH_TIME").map((e: any) => e.programme_id as string))) as string[];
-  projectCols.sort();
+    : Array.from(new Set(filteredEntries.filter((e: any) => e.programme_id && e.programme_id !== "DC_BAU" && e.programme_id !== "BENCH_TIME").map((e: any) => e.programme_id as string).filter(Boolean))) as string[];
+  projectCols.sort((a, b) => (a || "").localeCompare(b || ""));
 
   // Map project names / details for visual colors
   const projectColorMap: Record<string, string> = {};
-  programmes.forEach((p: any) => {
-    projectColorMap[p.id] = p.colour || "#0B5BAF";
+  (programmes || []).forEach((p: any) => {
+    if (p && p.id) {
+      projectColorMap[p.id] = p.colour || "#0B5BAF";
+    }
   });
 
   // Compute pivot cell values
   const pivotRows = allowedPeople.map((person: any) => {
-    const name = person.name;
-    const personEntries = filteredEntries.filter((e: any) => e.person_name === name);
+    const name = person.name || person.id || "Unknown";
+    const personEntries = filteredEntries.filter((e: any) => (e.person_name && e.person_name === name) || (person.id && e.person_id === person.id));
     
     const projectHours: Record<string, number> = {};
     projectCols.forEach((col: string) => {

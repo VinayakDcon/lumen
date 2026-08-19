@@ -44,13 +44,13 @@ export default function BudgetPage() {
     return budgetLines
       .filter((b) => {
         const matchesSearch = 
-          b.line_item.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          b.phase.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          (b.line_item || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
+          (b.phase || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
           (b.notes || "").toLowerCase().includes(searchQuery.toLowerCase());
         const matchesCat = !categoryFilter || b.category === categoryFilter;
         return matchesSearch && matchesCat;
       })
-      .sort((a, b) => a.phase.localeCompare(b.phase) || a.id - b.id);
+      .sort((a, b) => (a.phase || "").localeCompare(b.phase || "") || (a.id || 0) - (b.id || 0));
   }, [budgetLines, searchQuery, categoryFilter]);
 
   // Open modal

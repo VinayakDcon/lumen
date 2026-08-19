@@ -41,13 +41,13 @@ export default function UsersPage() {
       .filter((u) => {
         const query = searchQuery.toLowerCase();
         const matchesSearch = 
-          u.name.toLowerCase().includes(query) || 
-          u.username.toLowerCase().includes(query) || 
-          u.email.toLowerCase().includes(query);
+          (u.name || "").toLowerCase().includes(query) || 
+          (u.username || "").toLowerCase().includes(query) || 
+          (u.email || "").toLowerCase().includes(query);
         const matchesRole = !roleFilter || u.role === roleFilter;
         return matchesSearch && matchesRole;
       })
-      .sort((a, b) => a.name.localeCompare(b.name));
+      .sort((a, b) => (a.name || "").localeCompare(b.name || ""));
   }, [users, searchQuery, roleFilter]);
 
   // Open modal

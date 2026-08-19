@@ -37,12 +37,12 @@ export default function LabEquipmentPage() {
     .filter((eq) => {
       const query = searchQuery.toLowerCase();
       return (
-        eq.name.toLowerCase().includes(query) ||
-        eq.type.toLowerCase().includes(query) ||
-        eq.location.toLowerCase().includes(query)
+        (eq.name || "").toLowerCase().includes(query) ||
+        (eq.type || "").toLowerCase().includes(query) ||
+        (eq.location || "").toLowerCase().includes(query)
       );
     })
-    .sort((a, b) => a.name.localeCompare(b.name));
+    .sort((a, b) => (a.name || "").localeCompare(b.name || ""));
 
   // Open modal
   const handleOpenModal = (eqId?: number) => {

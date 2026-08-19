@@ -46,15 +46,15 @@ export default function StandardsPage() {
       .filter((s) => {
         const query = searchQuery.toLowerCase();
         const matchesSearch = 
-          s.code.toLowerCase().includes(query) ||
-          s.title.toLowerCase().includes(query) ||
-          (s.tags.join(" ").toLowerCase().includes(query));
+          (s.code || "").toLowerCase().includes(query) ||
+          (s.title || "").toLowerCase().includes(query) ||
+          ((s.tags || []).join(" ").toLowerCase().includes(query));
         const matchesMarket = !marketFilter || s.market === marketFilter;
         // In a real app we might filter standards by what applies to the programme, 
         // but for a general library, we might show all. We'll show all here.
         return matchesSearch && matchesMarket;
       })
-      .sort((a, b) => a.code.localeCompare(b.code));
+      .sort((a, b) => (a.code || "").localeCompare(b.code || ""));
   }, [standards, searchQuery, marketFilter]);
 
   // Open modal

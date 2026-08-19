@@ -170,12 +170,12 @@ export default function ResourcesPage() {
       .filter((r) => {
         const query = searchQuery.toLowerCase();
         return (
-          r.personName.toLowerCase().includes(query) ||
-          r.resourceId.toLowerCase().includes(query) ||
+          (r.personName || "").toLowerCase().includes(query) ||
+          (r.resourceId || "").toLowerCase().includes(query) ||
           (r.role_override || "").toLowerCase().includes(query)
         );
       })
-      .sort((a, b) => a.personName.localeCompare(b.personName));
+      .sort((a, b) => (a.personName || "").localeCompare(b.personName || ""));
   }, [resourcesWithPeople, searchQuery]);
 
   // Open modal
